@@ -1,0 +1,50 @@
+{
+  "@@locale" : "ja",
+
+  "opener_enter_url": "ネットワークにログインするためのURLを入力してください。",
+  "opener_need_help": "ヘルプが必要ですか？",
+
+  "help_title": "HumHubとは？",
+  "help_first_par": "HumHubは、主にソーシャルネットワーク、イントラネット、またはコミュニケーションプラットフォームとして、組織、団体、企業で使用されるオープンソースソフトウェアです。",
+  "help_second_par": "このソフトウェアは組織構造をデジタル化し、世界中の人々がつながり、コミュニケーションし、日々の共同作業を容易にすることを支援します。HumHubアプリは直感的に使用でき、どこからでもネットワークにアクセスして閲覧することができます。",
+  "help_third_par": "HumHubアプリは直感的に使用でき、どこからでもネットワークにアクセスできます。通知を有効にすると、ネットワーク内の重要な情報についてプッシュ通知を受け取ることができ、関連するニュースを常に把握するためにアプリを利用できます。",
+  "help_forth_par": "HumHubネットワークは基本的にプライベート（組織内）なコミュニケーションプラットフォームです。対応するログインデータを持つ既存のネットワークにのみログイン可能です。もちろん、組織や企業は独自のHumHubネットワークをいつでもセットアップして運用できます。詳細情報は次をご覧ください。",
+
+  "how_to_connect_title": "ネットワークに接続するには？",
+  "how_to_connect_first_par": "世界中に何千ものネットワークが存在します。そのため、既存のネットワークにログインするには、自分のネットワークの正確なURLが必要です。",
+  "how_to_connect_sec_par": "ログイン画面で使用するURLは、ブラウザのアドレスバーに表示されます。",
+  "how_to_connect_third_par": "URLまたはログイン情報がわからない場合は、管理者またはネットワーク運営者にお問い合わせください。",
+  "how_to_connect_url_example": "example.humhub.com",
+
+  "more_info_title": "HumHubとは？",
+  "more_info_first_par": "HumHubネットワークは基本的に閉じたコミュニケーションプラットフォーム（組織内）です。既存のネットワークにのみログイン可能です。",
+  "more_info_second_par": "もちろん、組織や企業は独自のHumHubネットワークをいつでもセットアップして運用できます。",
+  "more_info_third_par": "詳細情報はこちらをご覧ください：",
+  "more_info_pro_edition": "HumHub.comを訪問する",
+
+  "connectivity_popup_title": "接続なし",
+  "connectivity_popup_content": "インターネット接続を確認して、再試行してください。",
+
+  "web_view_exit_popup_title": "本当に終了しますか？",
+  "web_view_exit_popup_content": "アプリを終了しますか？",
+
+  "file_download": "ファイルがダウンロードされました",
+  "generic_error": "おっと！問題が発生しました。",
+
+  "enable_permissions": "権限を有効にする。",
+
+  "downloading": "ダウンロード中",
+  "settings": "設定",
+  "connect": "接続",
+  "open": "開く",
+  "cancel" : "キャンセル",
+  "url": "URL",
+  "back": "戻る",
+  "next": "次へ",
+  "connect_now": "今すぐ接続",
+  "enable": "有効にする",
+  "skip": "スキップ",
+  "ok": "OK",
+  "no": "いいえ",
+  "yes": "はい"
+}

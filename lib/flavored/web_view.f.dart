@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:app_badge_plus/app_badge_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:humhub/app_flavored.dart';
@@ -21,7 +21,7 @@ import 'package:humhub/util/web_view_global_controller.dart';
 import 'package:loggy/loggy.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:humhub/util/file_handler.dart';
+import 'package:humhub/util/file_download_manager.dart';
 import 'package:open_file_plus/open_file_plus.dart';
 
 class WebViewF extends ConsumerStatefulWidget {
@@ -59,9 +59,7 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
         if (Platform.isAndroid) {
           WebViewGlobalController.value?.reload();
         } else if (Platform.isIOS) {
-          WebViewGlobalController.value?.loadUrl(
-              urlRequest:
-                  URLRequest(url: await WebViewGlobalController.value?.getUrl(), headers: instance.customHeaders));
+          WebViewGlobalController.value?.loadUrl(urlRequest: URLRequest(url: await WebViewGlobalController.value?.getUrl(), headers: instance.customHeaders));
         }
       },
     );
@@ -108,8 +106,7 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
     return URLRequest(url: WebUri(url), headers: instance.customHeaders);
   }
 
-  Future<NavigationActionPolicy?> _shouldOverrideUrlLoading(
-      InAppWebViewController controller, NavigationAction action) async {
+  Future<NavigationActionPolicy?> _shouldOverrideUrlLoading(InAppWebViewController controller, NavigationAction action) async {
     // 1st check if url is not def. app url and open it in a browser or inApp.
     WebViewGlobalController.ajaxSetHeaders(headers: instance.customHeaders);
     WebViewGlobalController.listenToImageOpen();
@@ -131,9 +128,7 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
       return NavigationActionPolicy.CANCEL;
     }
     // 2nd Append customHeader if url is in app redirect and CANCEL the requests without custom headers
-    if (Platform.isAndroid ||
-        action.navigationType == NavigationType.LINK_ACTIVATED ||
-        action.navigationType == NavigationType.FORM_SUBMITTED) {
+    if (Platform.isAndroid || action.navigationType == NavigationType.LINK_ACTIVATED || action.navigationType == NavigationType.FORM_SUBMITTED) {
       Map<String, String> mergedMap = {...instance.customHeaders, ...?action.request.headers};
       URLRequest newRequest = action.request.copyWith(headers: mergedMap);
       controller.loadUrl(urlRequest: newRequest);
@@ -159,7 +154,7 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
   }
 
   Future<FetchRequest?> _shouldInterceptFetchRequest(InAppWebViewController controller, FetchRequest request) async {
-    request.headers!.addAll(_initialRequest.headers!);
+    request.headers?.addAll(instance.customHeaders);
     return request;
   }
 
@@ -181,11 +176,9 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
   Future<void> _onLoadStop(InAppWebViewController controller, Uri? url) async {
     // Disable remember me checkbox on login and set def. value to true: check if the page is actually login page, if it is inject JS that hides element
     if (url!.path.contains('/user/auth/login')) {
+      WebViewGlobalController.value!.evaluateJavascript(source: "document.querySelector('#login-rememberme').checked=true");
       WebViewGlobalController.value!
-          .evaluateJavascript(source: "document.querySelector('#login-rememberme').checked=true");
-      WebViewGlobalController.value!.evaluateJavascript(
-          source:
-              "document.querySelector('#account-login-form > div.form-group.field-login-rememberme').style.display='none';");
+          .evaluateJavascript(source: "document.querySelector('#account-login-form > div.form-group.field-login-rememberme').style.display='none';");
     }
     WebViewGlobalController.ajaxSetHeaders(headers: instance.customHeaders);
     WebViewGlobalController.listenToImageOpen();
@@ -229,7 +222,8 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
         }
         break;
       case ChannelAction.updateNotificationCount:
-        if (message.count != null) FlutterAppBadger.updateBadgeCount(message.count!);
+        UpdateNotificationCountChannelData data = message.data as UpdateNotificationCountChannelData;
+        AppBadgePlus.updateBadge(data.count);
         break;
       case ChannelAction.unregisterFcmDevice:
         String? token = ref.read(pushTokenProvider).value;
@@ -287,14 +281,14 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
     Timer? downloadTimer;
     bool isDone = false;
 
-    FileHandler(
+    FileDownloadManager(
       downloadStartRequest: downloadStartRequest,
       controller: controller,
       onSuccess: (File file, String filename) async {
         // Hide the bottom sheet if it is visible
         Navigator.popUntil(context, ModalRoute.withName(WebViewF.path));
         isDone = true;
-        scaffoldMessengerStateKey.currentState?.showSnackBar(
+        Keys.scaffoldMessengerStateKey.currentState?.showSnackBar(
           SnackBar(
             content: Text('${AppLocalizations.of(context)!.file_download}: $filename'),
             action: SnackBarAction(
@@ -368,7 +362,7 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
         if (persistentController != null) {
           Navigator.popUntil(context, ModalRoute.withName(WebViewF.path));
         }
-        scaffoldMessengerStateKey.currentState?.showSnackBar(
+        Keys.scaffoldMessengerStateKey.currentState?.showSnackBar(
           SnackBar(
             content: Text(AppLocalizations.of(context)!.generic_error),
           ),

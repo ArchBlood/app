@@ -23,7 +23,7 @@ class WebViewGlobalController {
   /// [url] is the URL to evaluate.
   /// @return `true` if the URL should open in a new window, `false` otherwise.
   static bool openCreateWindowInWebView({required String url, required Manifest manifest}) {
-    String? baseUrl = manifest.baseUrl;
+    String? baseUrl = manifest.startUrl;
     if (url.startsWith('$baseUrl/file/file/download')) return true;
     if (url.startsWith('$baseUrl/u')) return true;
     if (url.startsWith('$baseUrl/s')) return true;
@@ -54,9 +54,7 @@ class WebViewGlobalController {
   }
 
   static void onLongPressHitTestResult(InAppWebViewController controller, InAppWebViewHitTestResult hitResult) async {
-    if (hitResult.extra != null &&
-        ([InAppWebViewHitTestResultType.SRC_ANCHOR_TYPE, InAppWebViewHitTestResultType.EMAIL_TYPE]
-            .contains(hitResult.type))) {
+    if (hitResult.extra != null && ([InAppWebViewHitTestResultType.SRC_ANCHOR_TYPE, InAppWebViewHitTestResultType.EMAIL_TYPE].contains(hitResult.type))) {
       Clipboard.setData(
         ClipboardData(text: hitResult.extra!),
       );
@@ -105,9 +103,10 @@ class WebViewGlobalController {
 
     _value?.addJavaScriptHandler(
       handlerName: 'onImageClosed',
-      callback: (args) {
+      callback: (args) async {
         if (!opened) return;
         opened = false;
+        zoomOut();
         _value?.setSettings(settings: settings(zoom: opened));
       },
     );
@@ -129,10 +128,17 @@ class WebViewGlobalController {
   """);
   }
 
+  static Future<void> zoomOut() async {
+    bool? canZoomOut = true;
+    while (canZoomOut ?? false) {
+      canZoomOut = await value?.zoomOut();
+    }
+  }
+
   static InAppWebViewSettings settings({bool zoom = false}) {
     return InAppWebViewSettings(
       useShouldOverrideUrlLoading: true,
-      useShouldInterceptFetchRequest: true,
+      useShouldInterceptFetchRequest: false,
       javaScriptEnabled: true,
       javaScriptCanOpenWindowsAutomatically: true,
       supportMultipleWindows: true,

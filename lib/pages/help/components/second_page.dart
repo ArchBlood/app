@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:humhub/components/ease_out_container.dart';
 import 'package:humhub/util/const.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:humhub/l10n/generated/app_localizations.dart';
 
 class SecondPage extends StatelessWidget {
   final bool fadeIn;
@@ -94,7 +94,7 @@ class SecondPage extends StatelessWidget {
                     style: ButtonStyle(
                       backgroundColor: WidgetStateProperty.resolveWith<Color>(
                         (Set<WidgetState> states) {
-                          return HumhubTheme.primaryColor;
+                          return Theme.of(context).primaryColor;
                         },
                       ),
                     ),

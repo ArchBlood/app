@@ -1,8 +1,8 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:humhub/models/hum_hub.dart';
 import 'package:humhub/models/manifest.dart';
+import 'package:humhub/models/remote_config.dart';
 import 'package:humhub/pages/web_view.dart';
 import 'package:humhub/util/crypt.dart';
 import 'package:humhub/util/providers.dart';
@@ -11,7 +11,7 @@ import 'package:rive/rive.dart';
 import '../api_provider.dart';
 import '../connectivity_plugin.dart';
 import '../form_helper.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:humhub/l10n/generated/app_localizations.dart';
 
 class VisibilityNotifier extends StateNotifier<bool> {
   VisibilityNotifier() : super(false);
@@ -25,13 +25,11 @@ class VisibilityNotifier extends StateNotifier<bool> {
   }
 }
 
-final textFieldVisibilityProvider =
-    StateNotifierProvider<VisibilityNotifier, bool>(
+final textFieldVisibilityProvider = StateNotifierProvider<VisibilityNotifier, bool>(
   (ref) => VisibilityNotifier(),
 );
 
-final languageSwitcherVisibilityProvider =
-    StateNotifierProvider<VisibilityNotifier, bool>(
+final languageSwitcherVisibilityProvider = StateNotifierProvider<VisibilityNotifier, bool>(
   (ref) => VisibilityNotifier(),
 );
 
@@ -39,14 +37,13 @@ final visibilityProvider = StateNotifierProvider<VisibilityNotifier, bool>(
   (ref) => VisibilityNotifier(),
 );
 
-final searchBarVisibilityNotifier =
-    StateNotifierProvider<VisibilityNotifier, bool>(
+final searchBarVisibilityNotifier = StateNotifierProvider<VisibilityNotifier, bool>(
   (ref) => VisibilityNotifier(),
 );
 
 class OpenerController {
   late AsyncValue<Manifest>? asyncData;
-  bool doesViewExist = false;
+  // bool doesViewExist = false;
   TextEditingController urlTextController = TextEditingController();
   late String? postcodeErrorMessage;
   final String formUrlKey = "redirect_url";
@@ -58,11 +55,9 @@ class OpenerController {
   late RiveAnimationController _animationReverseController;
   late SimpleAnimation _animationReverse;
 
-  RiveAnimationController get animationForwardController =>
-      _animationForwardController;
+  RiveAnimationController get animationForwardController => _animationForwardController;
   SimpleAnimation get animationForward => _animationForward;
-  RiveAnimationController get animationReverseController =>
-      _animationReverseController;
+  RiveAnimationController get animationReverseController => _animationReverseController;
   SimpleAnimation get animationReverse => _animationReverse;
 
   final FormHelper helper = FormHelper();
@@ -92,15 +87,6 @@ class OpenerController {
     return manifestUrl;
   }
 
-  checkHumHubModuleView(String url) async {
-    Response? response;
-    response = await Dio().get(Uri.parse(url).toString()).catchError((err) {
-      return Response(data: "Found manifest but not humhub.modules.ui.view tag", statusCode: 404, requestOptions: RequestOptions());
-    });
-
-    doesViewExist = response.statusCode == 200 && response.data.contains('humhub.modules.ui.view');
-  }
-
   initHumHub() async {
     // Validate the URL format and if !value.isEmpty
     if (!helper.validate()) return;
@@ -117,14 +103,11 @@ class OpenerController {
     }
     // Get the manifest.json for given url.
     String? manifestUrl = await findManifest(helper.model[formUrlKey]!);
-    if (asyncData!.hasValue && manifestUrl != null) {
-      await checkHumHubModuleView(asyncData!.value!.startUrl);
-    }
     // If manifest.json does not exist the url is incorrect.
     // This is a temp. fix the validator expect sync function this is established workaround.
     // In the future we could define our own TextFormField that would also validate the API responses.
     // But it this is not acceptable I can suggest simple popup or tempPopup.
-    if (asyncData!.hasError || !doesViewExist || manifestUrl == null) {
+    if (asyncData!.hasError || manifestUrl == null) {
       logError("Open URL error: $asyncData");
       String value = urlTextController.text;
       urlTextController.text = error404;
@@ -142,14 +125,14 @@ class OpenerController {
         hash = ref.read(humHubProvider).randomHash ?? hash;
       }
       await ref.read(humHubProvider.notifier).addOrUpdateHistory(manifest);
-      HumHub instance = ref.read(humHubProvider).copyWith(
-          manifest: manifest, randomHash: hash, manifestUrl: manifestUrl);
+      HumHub instance = ref.read(humHubProvider).copyWith(manifest: manifest, randomHash: hash, manifestUrl: manifestUrl);
+      RemoteConfig? remoteConfig = await RemoteConfig.get(manifest, instance.customHeaders);
+      instance = instance.copyWith(remoteConfig: remoteConfig);
       await ref.read(humHubProvider.notifier).setInstance(instance);
     }
   }
 
-  bool get allOk =>
-      !(asyncData == null || asyncData!.hasError || !doesViewExist);
+  bool get allOk => !(asyncData == null || asyncData!.hasError);
   String? validateUrl(String? value, BuildContext context) {
     if (value == error404) return AppLocalizations.of(context)!.error_404;
     if (value == noConnection) {
@@ -166,15 +149,12 @@ class OpenerController {
     Uri uri = assumeUrl(url);
 
     for (var i = uri.pathSegments.length; i >= 0; i--) {
-      String urlIn =
-          "${uri.origin}/${uri.pathSegments.getRange(0, i).join('/')}";
+      String urlIn = "${uri.origin}/${uri.pathSegments.getRange(0, i).join('/')}";
       urls.add(Manifest.defineUrl(i != 0 ? urlIn : uri.origin));
     }
     for (var i = uri.pathSegments.length; i >= 0; i--) {
-      String urlIn =
-          "${uri.origin}/${uri.pathSegments.getRange(0, i).join('/')}";
-      urls.add(
-          Manifest.defineUrl(i != 0 ? urlIn : uri.origin, isUriPretty: false));
+      String urlIn = "${uri.origin}/${uri.pathSegments.getRange(0, i).join('/')}";
+      urls.add(Manifest.defineUrl(i != 0 ? urlIn : uri.origin, isUriPretty: false));
     }
     return urls;
   }
@@ -211,9 +191,7 @@ class OpenerController {
 
         Future.delayed(const Duration(milliseconds: 700), () {
           ref.read(textFieldVisibilityProvider.notifier).setVisibility(true);
-          ref
-              .read(languageSwitcherVisibilityProvider.notifier)
-              .setVisibility(true);
+          ref.read(languageSwitcherVisibilityProvider.notifier).setVisibility(true);
         });
 
         _animationReverseController.isActive = true;
@@ -231,8 +209,7 @@ class OpenerController {
       ref.read(humHubProvider).getInstance().then((instance) {
         FocusManager.instance.primaryFocus?.unfocus();
         animationNavigationWrapper(
-          navigate: () => Navigator.pushNamed(ref.context, WebView.path,
-              arguments: instance.manifest),
+          navigate: () => Navigator.pushNamed(ref.context, WebView.path, arguments: instance.manifest),
         );
       });
     }

@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:humhub/models/file_upload_settings.dart';
 import 'package:humhub/models/hum_hub.dart';
 import 'package:humhub/models/manifest.dart';
-
-import 'const.dart';
+import 'package:humhub/models/remote_config.dart';
+import 'package:humhub/util/storage_service.dart';
 
 class HumHubNotifier extends ChangeNotifier {
   final HumHub _humHubInstance;
@@ -20,6 +20,7 @@ class HumHubNotifier extends ChangeNotifier {
   String? get pushToken => _humHubInstance.pushToken;
   String? get manifestUrl => _humHubInstance.manifestUrl;
   Map<String, String> get customHeaders => _humHubInstance.customHeaders;
+  RemoteConfig? get remoteConfig => _humHubInstance.remoteConfig;
   List<Manifest> get history => _humHubInstance.history;
   FileUploadSettings? get fileUploadSettings => _humHubInstance.fileUploadSettings;
 
@@ -40,6 +41,7 @@ class HumHubNotifier extends ChangeNotifier {
       history: instance.history,
       manifestUrl: instance.manifestUrl,
       fileUploadSettings: instance.fileUploadSettings,
+      remoteConfig: instance.remoteConfig,
     );
     _humHubInstance.manifest = copy.manifest;
     _humHubInstance.openerState = copy.openerState;
@@ -49,6 +51,8 @@ class HumHubNotifier extends ChangeNotifier {
     _humHubInstance.history = copy.history;
     _humHubInstance.history = copy.history;
     _humHubInstance.fileUploadSettings = copy.fileUploadSettings;
+    _humHubInstance.fileUploadSettings = copy.fileUploadSettings;
+    _humHubInstance.remoteConfig = copy.remoteConfig;
     _updateSafeStorage();
     notifyListeners();
   }
@@ -69,6 +73,7 @@ class HumHubNotifier extends ChangeNotifier {
     List<Manifest>? history,
     String? manifestUrl,
     FileUploadSettings? fileUploadSettings,
+    RemoteConfig? remoteConfig,
   }) {
     HumHub instance = HumHub(
       openerState: openerState ?? this.openerState,
@@ -79,6 +84,7 @@ class HumHubNotifier extends ChangeNotifier {
       history: history ?? this.history,
       manifestUrl: manifestUrl ?? this.manifestUrl,
       fileUploadSettings: fileUploadSettings ?? this.fileUploadSettings,
+      remoteConfig: remoteConfig ?? this.remoteConfig,
     );
     _humHubInstance.manifest = instance.manifest;
     _humHubInstance.openerState = instance.openerState;
@@ -116,13 +122,13 @@ class HumHubNotifier extends ChangeNotifier {
   }
 
   Future<void> clearSafeStorage() async {
-    await InternalStorage.storage.delete(key: InternalStorage.keyHumhubInstance);
+    await SecureStorageService.instance.delete(key: SecureStorageService.keys.humhubInstance);
   }
 
   Future<HumHub> getInstance() async {
-    var jsonStr = await InternalStorage.storage.read(key: InternalStorage.keyHumhubInstance);
+    var jsonStr = await SecureStorageService.instance.read(key: SecureStorageService.keys.humhubInstance);
     HumHub humHub = jsonStr != null ? HumHub.fromJson(json.decode(jsonStr)) : _humHubInstance;
-    lastUrl = await InternalStorage.storage.read(key: InternalStorage.keyLastInstanceUrl) ?? "";
+    lastUrl = await SecureStorageService.instance.read(key: SecureStorageService.keys.lastInstanceUrl) ?? "";
 
     /// Download icons for shortcuts if not yet saved in internal storage
     for (var value in humHub.history) {
@@ -141,9 +147,9 @@ class HumHubNotifier extends ChangeNotifier {
 
     String lastUrl = (_humHubInstance.manifestUrl != null ? _humHubInstance.manifestUrl! : this.lastUrl);
 
-    await InternalStorage.storage.write(key: InternalStorage.keyHumhubInstance, value: jsonString);
+    await SecureStorageService.instance.write(key: SecureStorageService.keys.humhubInstance, value: jsonString);
 
-    await InternalStorage.storage.write(key: InternalStorage.keyLastInstanceUrl, value: lastUrl);
+    await SecureStorageService.instance.write(key: SecureStorageService.keys.lastInstanceUrl, value: lastUrl);
   }
 }
 

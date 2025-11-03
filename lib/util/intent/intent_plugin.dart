@@ -57,7 +57,8 @@ class IntentPluginState extends ConsumerState<IntentPlugin> {
       _sub = appLinks.uriLinkStream.listen((Uri? uri) async {
         if (!mounted || uri == null) return;
 
-        final latestUri = await UrlProviderHandler.handleUniversalLink(uri) ?? uri;
+        Uri? latestUri = await UrlProviderHandler.handleUniversalLink(uri);
+        if(latestUri == null) return;
 
         // Update the latest URI using the provider
         ref.read(intentProvider.notifier).setLatestUri(latestUri);
@@ -92,7 +93,8 @@ class IntentPluginState extends ConsumerState<IntentPlugin> {
         // Update the initial URI using the provider
         ref.read(intentProvider.notifier).setInitialUri(uri);
 
-        final latestUri = await UrlProviderHandler.handleUniversalLink(uri) ?? uri;
+        Uri? latestUri = await UrlProviderHandler.handleUniversalLink(uri);
+        if(latestUri == null) return;
 
         // Update the latest URI using the provider
         ref.read(intentProvider.notifier).setLatestUri(latestUri);
@@ -120,7 +122,7 @@ class IntentPluginState extends ConsumerState<IntentPlugin> {
   /// Handle file sharing using `receive_sharing_intent`
   void _handleFileSharing() {
     intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream().listen(
-      (List<SharedMediaFile> value) {
+          (List<SharedMediaFile> value) {
         // Update shared files using the provider
         ref.read(intentProvider.notifier).setSharedFiles(value);
 
@@ -129,7 +131,6 @@ class IntentPluginState extends ConsumerState<IntentPlugin> {
       onError: (err) {
         // Update error using the provider
         ref.read(intentProvider.notifier).setError(err);
-
         logError('Error receiving shared files: $err');
       },
     );
@@ -146,7 +147,6 @@ class IntentPluginState extends ConsumerState<IntentPlugin> {
   Future<bool> tryNavigateWithOpener(String redirectUrl) async {
     final latestUri = ref.read(intentProvider).latestUri;
     logInfo('IntentPlugin.tryNavigateWithOpener', latestUri);
-
     bool isNewRouteSameAsCurrent = false;
     Keys.navigatorKey.currentState!.popUntil((route) {
       if (route.settings.name == WebView.path) {
@@ -154,12 +154,9 @@ class IntentPluginState extends ConsumerState<IntentPlugin> {
       }
       return true;
     });
-
     UniversalOpenerController opener = UniversalOpenerController(url: redirectUrl);
     await opener.initHumHub();
-
     Keys.navigatorKey.currentState!.pushNamed(WebView.path, arguments: opener);
-
     return isNewRouteSameAsCurrent;
   }
 

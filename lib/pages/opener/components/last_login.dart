@@ -1,8 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:humhub/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:humhub/models/manifest.dart';
-import 'package:humhub/util/const.dart';
 
 class LastLoginWidget extends StatelessWidget {
   final List<Manifest> history;
@@ -20,10 +19,13 @@ class LastLoginWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    double listHeight = MediaQuery.of(context).size.height * 0.33;
+    double tileHeight = listHeight * 0.23;
     return Column(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(
+        SizedBox(
+          height: listHeight,
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
             shrinkWrap: true,
@@ -32,6 +34,7 @@ class LastLoginWidget extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.symmetric(vertical: 6),
                 child: InstanceTile(
+                  height: tileHeight,
                   manifest: history[index],
                   onSelectNetwork: onSelectNetwork,
                   onDeleteNetwork: (manifest) => onDeleteNetwork(manifest, history.length == 1),
@@ -51,6 +54,7 @@ class LastLoginWidget extends StatelessWidget {
 
 class InstanceTile extends StatelessWidget {
   final Manifest manifest;
+  final double height;
   final void Function(Manifest manifest) onSelectNetwork;
   final void Function(Manifest manifest) onDeleteNetwork;
 
@@ -61,14 +65,15 @@ class InstanceTile extends StatelessWidget {
     required this.manifest,
     required this.onSelectNetwork,
     required this.onDeleteNetwork,
+    this.height = 65,
   });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(borderRadius),
-      splashColor: HumhubTheme.primaryColor,
-      highlightColor: HumhubTheme.primaryColor,
+      splashColor: Theme.of(context).primaryColor,
+      highlightColor: Theme.of(context).primaryColor,
       onTap: () => onSelectNetwork(manifest),
       child: Container(
         margin: const EdgeInsets.all(1),
@@ -97,7 +102,7 @@ class InstanceTile extends StatelessWidget {
             onDeleteNetwork(manifest);
           },
           child: Container(
-            height: 65,
+            height: height,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -164,11 +169,11 @@ class AddNetworkTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.add, size: 28, color: HumhubTheme.primaryColor),
+            Icon(Icons.add, size: 28, color: Theme.of(context).primaryColor),
             const SizedBox(width: 10),
             Text(
               AppLocalizations.of(context)!.add_network,
-              style: TextStyle(fontSize: 16, color: HumhubTheme.primaryColor, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 16, color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold),
             ),
           ],
         ),

@@ -13,7 +13,7 @@ import 'package:humhub/util/show_dialog.dart';
 import 'package:humhub/util/web_view_global_controller.dart';
 import 'package:loggy/loggy.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:humhub/l10n/generated/app_localizations.dart';
 
 import 'intent/intent_state.dart';
 
@@ -44,30 +44,41 @@ class FileUploadManager {
   ///
   /// [showShareModal] determines whether to show a web share modal after upload
   Future<void> upload({bool showShareModal = true}) async {
-    if (!context.mounted || intentNotifier.currentState.isSharedFilesNullOrEmpty()) return;
+    logInfo('FileUploadManager: Starting upload process');
+    if (!context.mounted || intentNotifier.currentState.isSharedFilesNullOrEmpty) {
+      logWarning('FileUploadManager: No files to upload or context not mounted');
+      return;
+    }
     List<SharedMediaFile>? files = intentNotifier.useSharedFiles()!;
+    logDebug('FileUploadManager: Files to upload: ${files.map((f) => f.path).toList()}');
     List<String>? errors = _validateRequest(files);
     if (!errors.isNullOrEmpty) {
+      logWarning('FileUploadManager: Validation errors: $errors');
       ShowDialog.of(context).intentErrors(errors!);
       return;
     }
     List<dynamic> requestData = await _getRequestData(files, fileUploadSettings!);
     if (requestData.isNullOrEmpty) {
+      logError('FileUploadManager: Failed to prepare request data');
       if (context.mounted) {
         ShowDialog.of(context).intentErrors([AppLocalizations.of(context)!.unexpected_error]);
       }
       return;
     }
+    logDebug('FileUploadManager: Prepared request data for upload');
     ajaxPostFiles(
       data: requestData,
       onResponse: (files) {
+        logInfo('FileUploadManager: Received upload response');
         List<String>? errors = _validateResponse(files);
         if (!errors.isNullOrEmpty) {
+          logWarning('FileUploadManager: Response validation errors: $errors');
           ShowDialog.of(context).intentErrors(errors!);
           return;
         }
         List<SharedFileItemSuccess> successFiles = files!.whereType<SharedFileItemSuccess>().toList();
         if (showShareModal) {
+          logInfo('FileUploadManager: Upload success for files: ${successFiles.map((f) => f.name).toList()}');
           _showFileShareModal(successFiles);
         }
       },
@@ -81,26 +92,40 @@ class FileUploadManager {
   List<String>? _validateRequest(List<SharedMediaFile>? files) {
     List<String> errors = [];
     if (fileUploadSettings == null) {
+      logError('FileUploadManager: Sharing not supported');
       errors.add(AppLocalizations.of(context)!.sharing_not_supported);
       logError(errors);
       return errors;
     }
 
     if (files.isNullOrEmpty) {
+      logError('FileUploadManager: No files to share');
       errors.add(AppLocalizations.of(context)!.no_files_to_share);
-      logError(errors);
-      return errors;
-    }
-    if (_filesSizeMb(files) > fileUploadSettings!.effectiveMaxFileSize) {
-      int limit = fileUploadSettings!.effectiveMaxFileSize.round();
-      errors.add(AppLocalizations.of(context)!.files_too_big(limit));
       logError(errors);
       return errors;
     }
 
     for (SharedMediaFile file in files!) {
+      final filePath = file.path;
+      if (!File(filePath).existsSync()) {
+        errors.add('File does not exist: ${file.path}');
+        logError(errors);
+        return errors;
+      }
+    }
+
+    if (_filesSizeMb(files) > fileUploadSettings!.effectiveMaxFileSize) {
+      int limit = fileUploadSettings!.effectiveMaxFileSize.round();
+      logWarning('FileUploadManager: Files too big (limit: $limit MB)');
+      errors.add(AppLocalizations.of(context)!.files_too_big(limit));
+      logError(errors);
+      return errors;
+    }
+
+    for (SharedMediaFile file in files) {
       if (fileUploadSettings!.allowedExtensions != null && !fileUploadSettings!.allowedExtensions!.contains(file.fileExtension)) {
         errors.add(AppLocalizations.of(context)!.file_type_not_supported(file.thumbnail ?? '', file.type.value));
+        logWarning('FileUploadManager: File type not supported: ${file.fileExtension}');
         logError(errors);
         continue;
       }
@@ -115,6 +140,7 @@ class FileUploadManager {
   List<String>? _validateResponse(List<SharedFileItem>? files) {
     List<String> errors = [];
     if (files.isNullOrEmpty) {
+      logError('FileUploadManager: No files uploaded in response');
       errors.add(AppLocalizations.of(context)!.no_files_uploaded);
       logError(errors);
       return errors;
@@ -122,11 +148,13 @@ class FileUploadManager {
     List<SharedFileItemError> errorFiles = files!.whereType<SharedFileItemError>().toList();
     List<SharedFileItemSuccess> successFiles = files.whereType<SharedFileItemSuccess>().toList();
     for (var errorFile in errorFiles) {
+      logError('FileUploadManager: Error from server: ${errorFile.errors}');
       errors.addAll(errorFile.errors);
       logError(errors);
     }
 
     if (successFiles.isNullOrEmpty) {
+      logError('FileUploadManager: No successful uploads in response');
       errors.add(AppLocalizations.of(context)!.no_files_uploaded);
       logError(errors);
     }
@@ -247,6 +275,7 @@ class FileUploadManager {
       webViewController.addJavaScriptHandler(
         handlerName: 'onAjaxError',
         callback: (args) {
+          logError('FileUploadManager: AJAX upload error: $args');
           onResponse(null);
         },
       );
@@ -257,6 +286,7 @@ class FileUploadManager {
   ///
   /// [successFiles] is a list of successfully uploaded files
   _showFileShareModal(List<SharedFileItemSuccess> successFiles) async {
+    logInfo('FileUploadManager: Showing file share modal for files: ${successFiles.map((f) => f.guid).toList()}');
     String guids = successFiles.asMap().entries.map((entry) {
       int index = entry.key;
       SharedFileItemSuccess file = entry.value;
@@ -264,8 +294,8 @@ class FileUploadManager {
     }).join('&');
 
     String jsCode = """
-    \$('#globalModal').modal('show');
-    \$('#globalModal .modal-content').load('${fileUploadSettings!.shareIntendTargetUrl}?$guids');
+    humhub.modules.ui.modal.global.show();
+    humhub.modules.ui.modal.global.load('${fileUploadSettings!.shareIntendTargetUrl}?$guids');
   """;
 
     await webViewController.evaluateJavascript(source: jsCode);

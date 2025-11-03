@@ -13,16 +13,19 @@ import 'package:humhub/models/channel_message.dart';
 import 'package:humhub/util/black_list_rules.dart';
 import 'package:humhub/util/const.dart';
 import 'package:humhub/util/extensions.dart';
+import 'package:humhub/util/file_upload_manager.dart';
 import 'package:humhub/util/init_from_url.dart';
+import 'package:humhub/util/intent/intent_state.dart';
 import 'package:humhub/util/loading_provider.dart';
+import 'package:humhub/util/providers.dart';
 import 'package:humhub/util/push/provider.dart';
 import 'package:humhub/util/show_dialog.dart';
 import 'package:humhub/util/web_view_global_controller.dart';
 import 'package:loggy/loggy.dart';
+import 'package:open_file/open_file.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:humhub/l10n/generated/app_localizations.dart';
 import 'package:humhub/util/file_download_manager.dart';
-import 'package:open_file_plus/open_file_plus.dart';
 
 class WebViewF extends ConsumerStatefulWidget {
   static const String path = '/web_view_f';
@@ -67,28 +70,30 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
 
   @override
   Widget build(BuildContext context) {
-    // ignore: deprecated_member_use
-    return WillPopScope(
-      onWillPop: () => exitApp(context, ref),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) => exitApp(context, ref),
       child: Scaffold(
         key: _scaffoldKey,
         backgroundColor: HexColor(instance.manifest.themeColor),
         body: SafeArea(
           bottom: false,
-          child: InAppWebView(
-            initialUrlRequest: _initialRequest,
-            initialSettings: WebViewGlobalController.settings(),
-            pullToRefreshController: pullToRefreshController,
-            shouldOverrideUrlLoading: _shouldOverrideUrlLoading,
-            shouldInterceptFetchRequest: _shouldInterceptFetchRequest,
-            onWebViewCreated: _onWebViewCreated,
-            onCreateWindow: _onCreateWindow,
-            onLoadStop: _onLoadStop,
-            onLoadStart: _onLoadStart,
-            onReceivedError: _onLoadError,
-            onProgressChanged: _onProgressChanged,
-            onDownloadStartRequest: _onDownloadStartRequest,
-            onLongPressHitTestResult: WebViewGlobalController.onLongPressHitTestResult,
+          child: FileUploadManagerWidget(
+            child: InAppWebView(
+              initialUrlRequest: _initialRequest,
+              initialSettings: WebViewGlobalController.settings(),
+              pullToRefreshController: pullToRefreshController,
+              shouldOverrideUrlLoading: _shouldOverrideUrlLoading,
+              shouldInterceptFetchRequest: _shouldInterceptFetchRequest,
+              onWebViewCreated: _onWebViewCreated,
+              onCreateWindow: _onCreateWindow,
+              onLoadStop: _onLoadStop,
+              onLoadStart: _onLoadStart,
+              onReceivedError: _onLoadError,
+              onProgressChanged: _onProgressChanged,
+              onDownloadStartRequest: _onDownloadStartRequest,
+              onLongPressHitTestResult: WebViewGlobalController.onLongPressHitTestResult,
+            ),
           ),
         ),
       ),
@@ -212,7 +217,7 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
   Future<void> _handleJSMessage(ChannelMessage message, HeadlessInAppWebView headlessWebView) async {
     switch (message.action) {
       case ChannelAction.registerFcmDevice:
-        String? token = ref.read(pushTokenProvider).value ?? await FirebaseMessaging.instance.getToken();
+        String? token = ref.read(pushTokenProvider).value ?? await FirebaseMessaging.instance.getTokenSafe();
         if (token != null) {
           WebViewGlobalController.ajaxPost(
             url: message.url!,
@@ -235,6 +240,16 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
           );
         }
         break;
+      case ChannelAction.fileUploadSettings:
+        logInfo('Action: fileUploadSettings');
+        FileUploadSettingsChannelData data = message.data as FileUploadSettingsChannelData;
+        ref.read(humHubProvider.notifier).setFileUploadSettings(data.settings);
+        FileUploadManager(
+            webViewController: WebViewGlobalController.value!,
+            intentNotifier: ref.read(intentProvider.notifier),
+            fileUploadSettings: data.settings,
+            context: context)
+            .upload();
       default:
         break;
     }
@@ -330,17 +345,17 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
                           ),
                           downloadProgress.toStringAsFixed(0) == "100"
                               ? const Icon(
-                                  Icons.check,
-                                  color: Colors.green,
-                                  size: 25,
-                                )
+                            Icons.check,
+                            color: Colors.green,
+                            size: 25,
+                          )
                               : Text(
-                                  downloadProgress.toStringAsFixed(0),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
+                            downloadProgress.toStringAsFixed(0),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                         ],
                       ),
                     ],

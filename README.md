@@ -1,3 +1,3 @@
 # HumHub Mobile App
 
-In development 
+In development

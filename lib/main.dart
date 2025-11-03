@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:humhub/models/hum_hub.dart';
@@ -5,22 +8,29 @@ import 'package:humhub/util/providers.dart';
 import 'package:humhub/util/router.dart';
 import 'package:loggy/loggy.dart';
 
-void main() async {
-  // Create a container to handle providers outside widget tree
-  final ref = ProviderContainer();
+void main() {
+  FlutterError.onError = (FlutterErrorDetails details) {
+    logError('Flutter framework error: ${details.exception}', details.exception, details.stack);
+    Zone.current.handleUncaughtError(details.exception, details.stack ?? StackTrace.current);
+  };
 
-  try {
-    // Initialize HumHub instance early
-    final app = await HumHub.init();
+  PlatformDispatcher.instance.onError = (error, stack) {
+    logError('PlatformDispatcher error: $error', error, stack);
+    return true;
+  };
+
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Firebase.initializeApp();
+    final ref = ProviderContainer();
+    final app = await HumHub.initApp();
     HumHub instance = await ref.read(humHubProvider).getInstance();
-    await MyRouter.initInitialRoute(instance);
-
-    // Use UncontrolledProviderScope to share the container
+    await AppRouter.initInitialRoute(instance);
     runApp(UncontrolledProviderScope(
       container: ref,
       child: app,
     ));
-  } catch (e) {
-    logError('Failed to initialize: $e');
-  }
+  }, (error, stack) {
+    logError('Global error: $error', error, stack);
+  });
 }

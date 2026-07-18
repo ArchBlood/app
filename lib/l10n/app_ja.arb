@@ -2,34 +2,41 @@
   "@@locale": "ja",
 
   "opener_enter_url": "URLを入力してネットワークにログインしてください。",
-  "opener_need_help": "ヘルプが必要ですか？",
+  "opener_need_help": "お困りですか？",
 
   "help_title": "HumHubとは？",
-  "help_first_par": "HumHubは、組織、団体、企業が主にソーシャルネットワーク、イントラネット、またはコミュニケーションプラットフォームとして利用するオープンソースソフトウェアです。",
-  "help_second_par": "このソフトウェアは組織構造をデジタル化し、世界中の人々がつながり、コミュニケーションをとり、日常業務を円滑に進めることを支援します。HumHubアプリは直感的に操作でき、ユーザーはどこからでも自分のネットワークにアクセスして閲覧できます。",
-  "help_third_par": "HumHubアプリは直感的に使いやすく、どこからでもネットワークにアクセスできます。通知を有効にすると、ネットワーク内の重要な情報についてプッシュ通知を受け取ることができ、常に最新のニュースを確認できます。",
-  "help_forth_par": "HumHubネットワークは基本的にプライベート（組織内）コミュニケーションプラットフォームです。対応するログイン情報を持つ既存のネットワークにのみログインすることができます。組織や企業は、いつでも独自のHumHubネットワークを構築・運用することが可能です。詳細情報はこちら：",
+  "help_first_par": "HumHubは、組織、団体、企業向けに提供されているオープンソースソフトウェアで、主にソーシャルネットワーク、イントラネット、またはコミュニケーションプラットフォームとして利用されています。",
+  "help_second_par": "このソフトウェアは組織構造のデジタル化を支援し、世界中の人々がつながり、コミュニケーションを取り、日々のコラボレーションを円滑に進められるようにします。HumHubアプリは直感的に操作でき、どこからでもネットワークへアクセスして利用できます。",
+  "help_third_par": "HumHubアプリは直感的に使いやすく、どこからでもネットワークへアクセスできます。通知を有効にすると、ネットワーク内の重要なお知らせをプッシュ通知で受け取り、最新情報をいつでも確認できます。",
+  "help_forth_par": "HumHubネットワークは基本的に非公開（組織内向け）のコミュニケーションプラットフォームです。既存のネットワークへは、対応するログイン情報がある場合のみアクセスできます。もちろん、組織や企業はいつでも独自のHumHubネットワークを構築・運用できます。詳細はこちらをご覧ください。",
 
   "how_to_connect_title": "ネットワークに接続するには？",
-  "how_to_connect_first_par": "世界中に何千ものネットワークがあります。そのため、既存のネットワークにログインするには、あなたのネットワーク固有の正確なURLが必要です。",
-  "how_to_connect_sec_par": "URLは、ネットワークのログイン画面でブラウザのアドレスバーに表示されます。",
-  "how_to_connect_third_par": "URLやログイン情報が不明な場合は、管理者またはネットワーク運営者にお問い合わせください。",
+  "how_to_connect_first_par": "世界中には数多くのHumHubネットワークがあります。そのため、既存のネットワークへログインするには、利用するネットワークの正確なURLが必要です。",
+  "how_to_connect_sec_par": "URLは、ネットワークのログイン画面を開いた際にブラウザのアドレスバーで確認できます。",
+  "how_to_connect_third_par": "URLやログイン情報がわからない場合は、管理者またはネットワーク運営者へお問い合わせください。",
   "how_to_connect_url_example": "example.humhub.com",
 
   "more_info_title": "HumHubとは？",
-  "more_info_first_par": "HumHubネットワークは基本的にクローズドな（組織内部の）コミュニケーションプラットフォームです。既存のネットワークにのみログインすることができます。",
-  "more_info_second_par": "もちろん、組織や企業はいつでも独自のHumHubネットワークを構築・運用することが可能です。",
-  "more_info_third_par": "すべての情報はこちらで確認できます：",
-  "more_info_pro_edition": "HumHub.comを訪問",
+  "more_info_first_par": "HumHubネットワークは基本的にクローズドなコミュニケーションプラットフォーム（組織内向け）です。既存のネットワークにのみログインできます。",
+  "more_info_second_par": "組織や企業は、いつでも独自のHumHubネットワークを構築・運用できます。",
+  "more_info_third_par": "詳しくはこちらをご覧ください：",
+  "more_info_pro_edition": "HumHub.comを見る",
 
-  "connectivity_popup_title": "接続なし",
-  "connectivity_popup_content": "インターネット接続を確認して、再試行してください。",
+  "connectivity_popup_title": "インターネット接続がありません",
+  "connectivity_popup_content": "接続を確認して、もう一度お試しください。",
 
-  "web_view_exit_popup_title": "本当に終了しますか？",
+  "web_view_exit_popup_title": "よろしいですか？",
   "web_view_exit_popup_content": "アプリを終了しますか？",
 
-  "file_download": "ファイルがダウンロードされました",
-  "generic_error": "おっと！問題が発生しました。",
+  "auth_web_view_back": "戻る",
+  "auth_web_view_go_back": "戻る",
+  "auth_web_view_go_forward": "進む",
+  "auth_web_view_share": "共有",
+  "auth_web_view_reload": "再読み込み",
+  "auth_web_view_close": "閉じる",
+
+  "file_download": "ファイルをダウンロードしました",
+  "generic_error": "問題が発生しました。",
 
   "enable_permissions": "権限を有効にしてください。",
 
@@ -39,24 +46,26 @@
   "settings": "設定",
   "connect": "接続",
   "open": "開く",
+  "share": "共有",
+  "save": "デバイスに保存",
   "cancel": "キャンセル",
   "url": "URL",
   "back": "戻る",
   "next": "次へ",
   "connect_now": "今すぐ接続",
-  "enable": "有効化",
+  "enable": "有効にする",
   "skip": "スキップ",
   "ok": "OK",
   "no": "いいえ",
   "yes": "はい",
 
-  "error_404": "HumHubインストールが存在しません",
+  "error_404": "HumHubのインストールが見つかりません。",
   "error_no_connection": "インターネット接続を確認してください。",
-  "error_url_empty": "HumHubの場所を指定してください。",
+  "error_url_empty": "HumHubのURLを入力してください。",
 
-  "sharing_not_supported": "このインスタンスではファイル共有がサポートされていません。管理者にお問い合わせください。",
-  "no_files_to_share": "共有できるファイルが見つかりません。",
-  "files_too_big": "ファイルが大きすぎます。上限は{limit}MBです。",
+  "sharing_not_supported": "このインスタンスではファイル共有はサポートされていません。管理者にお問い合わせください。",
+  "no_files_to_share": "共有するファイルが見つかりません。",
+  "files_too_big": "共有するにはファイルサイズが大きすぎます。上限は{limit}MBです。",
   "@files_too_big": {
     "placeholders": {
       "limit": {
@@ -64,9 +73,9 @@
       }
     }
   },
-  "no_files_uploaded": "アップロードされたファイルがありません。サポートが必要な場合は管理者にお問い合わせください。",
+  "no_files_uploaded": "ファイルはアップロードされませんでした。サポートについては管理者にお問い合わせください。",
   "unexpected_error": "予期しないエラーが発生しました。",
-  "file_type_not_supported": "ファイル {filename}（タイプ: {fileType}）はサポートされていません。",
+  "file_type_not_supported": "{filename}（{fileType}）はサポートされていないファイル形式です。",
   "@file_type_not_supported": {
     "placeholders": {
       "filename": {
@@ -79,19 +88,21 @@
   },
   "file_sharing_error": "ファイル共有エラー",
   "close": "閉じる",
+  "intent_links_disabled_popup_title": "対応リンクを開く機能が無効です",
+  "intent_links_disabled_popup_content": "このアプリで対応するWebアドレスを再度有効にするまで、HumHubからのリンクはブラウザで開かれます。",
 
   "language_en": "英語",
   "language_de": "ドイツ語",
   "language_fr": "フランス語",
-  "language_saved": "選択した言語が保存されました。",
+  "language_saved": "選択した言語を保存しました。",
 
   "data_sharing_title": "HumHubアプリの改善にご協力ください",
-  "data_sharing_content": "アプリ体験の向上のため、以下のオプションを有効にすることを検討してください。これにより、HumHubは匿名のエラーレポートや基本的なデバイス情報を受け取り、バグの早期検出、実際の使用環境での動作分析、改善の優先順位付けに役立てます。",
+  "data_sharing_content": "アプリ体験の向上のため、以下のオプションを有効にすることをご検討ください。有効にすると、匿名のエラーレポートや基本的なデバイス情報がHumHubへ送信されます。これにより、不具合をより早く発見し、実際の利用環境でのアプリの動作を把握し、改善の優先順位を決定することができます。",
   "data_sharing_error_reports_title": "匿名のエラーレポートを送信",
-  "data_sharing_error_reports_subtitle": "クラッシュログや技術的なエラーを含みます。個人データは共有されません。",
+  "data_sharing_error_reports_subtitle": "クラッシュログや技術的なエラー情報が含まれます。個人情報は送信されません。",
   "data_sharing_device_id_title": "デバイスおよびセッション識別子を送信",
-  "data_sharing_device_id_subtitle": "複数のデバイスやセッション間で問題を追跡し、バグの再現性を向上させます。",
-  "data_sharing_saved": "選択内容が保存されました。",
+  "data_sharing_device_id_subtitle": "デバイスやセッションをまたいで問題を追跡するために使用されます。不具合をより正確に再現するのに役立ちます。",
+  "data_sharing_saved": "設定を保存しました。",
 
   "accept_all": "すべて許可",
   "decline_all": "すべて拒否"

@@ -1,14 +1,15 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:app_badge_plus/app_badge_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:humhub/app_flavored.dart';
+import 'package:humhub/models/auth_web_view_args.dart';
+import 'package:humhub/pages/auth_web_view.dart';
 import 'package:humhub/flavored/models/humhub.f.dart';
-import 'package:humhub/util/auth_in_app_browser.dart';
+import 'package:humhub/models/feature_flag.dart';
 import 'package:humhub/models/channel_message.dart';
 import 'package:humhub/util/black_list_rules.dart';
 import 'package:humhub/util/const.dart';
@@ -22,7 +23,7 @@ import 'package:humhub/util/push/provider.dart';
 import 'package:humhub/util/show_dialog.dart';
 import 'package:humhub/util/web_view_global_controller.dart';
 import 'package:loggy/loggy.dart';
-import 'package:open_file/open_file.dart';
+import 'package:humhub/components/file_actions_bottom_sheet.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:humhub/l10n/generated/app_localizations.dart';
 import 'package:humhub/util/file_download_manager.dart';
@@ -36,7 +37,6 @@ class WebViewF extends ConsumerStatefulWidget {
 }
 
 class FlavoredWebViewState extends ConsumerState<WebViewF> {
-  late AuthInAppBrowser _authBrowser;
   HeadlessInAppWebView? headlessWebView;
   late HumHubF instance;
   final _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -46,12 +46,6 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
   @override
   void initState() {
     instance = ref.read(humHubFProvider);
-    _authBrowser = AuthInAppBrowser(
-      manifest: ref.read(humHubFProvider).manifest,
-      concludeAuth: (URLRequest request) {
-        _concludeAuth(request);
-      },
-    );
     super.initState();
 
     pullToRefreshController = PullToRefreshController(
@@ -70,6 +64,7 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(humHubFRemoteConfigProvider);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) => exitApp(context, ref),
@@ -80,6 +75,7 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
           bottom: false,
           child: FileUploadManagerWidget(
             child: InAppWebView(
+              preventGestureDelay: true,
               initialUrlRequest: _initialRequest,
               initialSettings: WebViewGlobalController.settings(),
               pullToRefreshController: pullToRefreshController,
@@ -122,13 +118,24 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
     if (BlackListRules.check(url)) {
       return NavigationActionPolicy.CANCEL;
     }
-    // For SSO
-    if (!url.startsWith(instance.manifest.baseUrl) && action.isForMainFrame) {
-      _authBrowser.launchUrl(action.request);
+    // Route external main-frame URLs based on whiteListedUrls presence
+    final remoteConfig = ref.read(humHubFRemoteConfigProvider).asData?.value;
+    if (!url.startsWith(instance.manifest.startUrl) && action.isForMainFrame) {
+      if (remoteConfig?.whiteListedUrls == null && remoteConfig?.authClientUrls == null) {
+        logInfo('Legacy SSO detected, launching AuthWebView for $url');
+        unawaited(_launchAuthWebView(action.request));
+        return NavigationActionPolicy.CANCEL;
+      }
+      if (remoteConfig!.isTrustedUrl(action.request.url!.uriValue)) {
+        logInfo('Whitelisted URL, launching AuthWebView for $url');
+        unawaited(_launchAuthWebView(action.request));
+        return NavigationActionPolicy.CANCEL;
+      }
+      await launchUrl(action.request.url!.uriValue, mode: LaunchMode.externalApplication);
       return NavigationActionPolicy.CANCEL;
     }
-    // For all other external links
-    if (!url.startsWith(instance.manifest.baseUrl) && !action.isForMainFrame) {
+    // For non-main-frame external links
+    if (!url.startsWith(instance.manifest.startUrl)) {
       await launchUrl(action.request.url!.uriValue, mode: LaunchMode.externalApplication);
       return NavigationActionPolicy.CANCEL;
     }
@@ -170,12 +177,18 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
       controller.loadUrl(urlRequest: createWindowAction.request);
       return Future.value(false);
     }
+    final remoteConfig = ref.read(humHubFRemoteConfigProvider).asData?.value;
+    if ((remoteConfig?.whiteListedUrls == null && remoteConfig?.authClientUrls == null) ||
+        remoteConfig!.isTrustedUrl(urlToOpen.uriValue)) {
+      unawaited(_launchAuthWebView(createWindowAction.request));
+      return Future.value(true);
+    }
     if (await canLaunchUrl(urlToOpen)) {
       await launchUrl(urlToOpen, mode: LaunchMode.externalApplication);
     } else {
       logError('Could not launch $urlToOpen');
     }
-    return Future.value(true); // Allow creating a new window.
+    return Future.value(true);
   }
 
   Future<void> _onLoadStop(InAppWebViewController controller, Uri? url) async {
@@ -199,7 +212,9 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
 
   void _onLoadError(InAppWebViewController controller, WebResourceRequest request, WebResourceError error) async {
     logError(error);
-    if (error.description == 'net::ERR_INTERNET_DISCONNECTED') ShowDialog.of(context).noInternetPopup();
+    if (error.description == 'net::ERR_INTERNET_DISCONNECTED') {
+      ShowDialog.of(context).noInternetPopup();
+    }
     pullToRefreshController.endRefreshing();
   }
 
@@ -210,12 +225,47 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
   }
 
   void _concludeAuth(URLRequest request) {
-    _authBrowser.close();
-    WebViewGlobalController.value!.loadUrl(urlRequest: request);
+    Map<String, String> mergedMap = {
+      ...instance.customHeaders,
+      ...?request.headers,
+    };
+    WebViewGlobalController.value!
+        .loadUrl(urlRequest: request.copyWith(headers: mergedMap));
+  }
+
+  Future<void> _launchAuthWebView(URLRequest request) async {
+    final result = await Navigator.of(context).pushNamed(
+      AuthWebView.path,
+      arguments: AuthWebViewArgs(
+        manifest: instance.manifest,
+        request: request,
+      ),
+    );
+
+    if (!mounted || result is! URLRequest) return;
+    _concludeAuth(result);
   }
 
   Future<void> _handleJSMessage(ChannelMessage message, HeadlessInAppWebView headlessWebView) async {
     switch (message.action) {
+      case ChannelAction.authClientRedirect:
+
+        final data = message.data as AuthClientRedirectChannelData;
+        data.handle(
+          isSupported: FeatureFlag.supportsAuthClientRedirect,
+          onIgnored: logInfo,
+          onLaunchable: (request, url) async {
+            if (_supportsAuthClientRedirect) {
+              logInfo('Launching flavored AuthWebView from authClientRedirect for $url');
+              unawaited(_launchAuthWebView(request));
+              return;
+            }
+
+            logInfo('Launching flavored browser from authClientRedirect for $url');
+            await launchUrl(request.url!.uriValue, mode: LaunchMode.externalApplication);
+          },
+        );
+        break;
       case ChannelAction.registerFcmDevice:
         String? token = ref.read(pushTokenProvider).value ?? await FirebaseMessaging.instance.getTokenSafe();
         if (token != null) {
@@ -227,8 +277,6 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
         }
         break;
       case ChannelAction.updateNotificationCount:
-        UpdateNotificationCountChannelData data = message.data as UpdateNotificationCountChannelData;
-        AppBadgePlus.updateBadge(data.count);
         break;
       case ChannelAction.unregisterFcmDevice:
         String? token = ref.read(pushTokenProvider).value;
@@ -245,14 +293,22 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
         FileUploadSettingsChannelData data = message.data as FileUploadSettingsChannelData;
         ref.read(humHubProvider.notifier).setFileUploadSettings(data.settings);
         FileUploadManager(
-            webViewController: WebViewGlobalController.value!,
-            intentNotifier: ref.read(intentProvider.notifier),
-            fileUploadSettings: data.settings,
-            context: context)
+                webViewController: WebViewGlobalController.value!,
+                intentNotifier: ref.read(intentProvider.notifier),
+                fileUploadSettings: data.settings,
+                context: context)
             .upload();
       default:
         break;
     }
+  }
+
+  bool get _supportsAuthClientRedirect {
+    final remoteConfig = ref.read(humHubFRemoteConfigProvider).asData?.value;
+    final supportsAuthClientRedirect = instance.forceV2AuthClient || remoteConfig?.supportsAuthClientRedirect == true;
+    logDebug(
+        'Flavored authClientRedirect supported: $supportsAuthClientRedirect (FORCE_V2_AUTH_CLIENT=${instance.forceV2AuthClient}, backend=${remoteConfig?.appVersion ?? 'unknown'})');
+    return supportsAuthClientRedirect;
   }
 
   Future<bool> exitApp(context, ref) async {
@@ -303,17 +359,7 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
         // Hide the bottom sheet if it is visible
         Navigator.popUntil(context, ModalRoute.withName(WebViewF.path));
         isDone = true;
-        Keys.scaffoldMessengerStateKey.currentState?.showSnackBar(
-          SnackBar(
-            content: Text('${AppLocalizations.of(context)!.file_download}: $filename'),
-            action: SnackBarAction(
-              label: AppLocalizations.of(context)!.open,
-              onPressed: () {
-                OpenFile.open(file.path);
-              },
-            ),
-          ),
-        );
+        FileActionsBottomSheet.show(context, file, filename);
       },
       onStart: () async {
         downloadProgress = 0;
@@ -345,17 +391,17 @@ class FlavoredWebViewState extends ConsumerState<WebViewF> {
                           ),
                           downloadProgress.toStringAsFixed(0) == "100"
                               ? const Icon(
-                            Icons.check,
-                            color: Colors.green,
-                            size: 25,
-                          )
+                                  Icons.check,
+                                  color: Colors.green,
+                                  size: 25,
+                                )
                               : Text(
-                            downloadProgress.toStringAsFixed(0),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
+                                  downloadProgress.toStringAsFixed(0),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
                         ],
                       ),
                     ],

@@ -7,11 +7,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:humhub/app_flavored.dart';
 import 'package:humhub/app_opener.dart';
+import 'package:humhub/models/feature_flag.dart';
 import 'package:humhub/models/global_package_info.dart';
 import 'package:humhub/models/manifest.dart';
 import 'package:humhub/models/remote_config.dart';
 import 'package:humhub/pages/settings/provider.dart';
 import 'package:humhub/util/log.dart';
+import 'package:humhub/util/intent/app_link_settings.dart';
 import 'package:humhub/util/openers/universal_opener_controller.dart';
 import 'package:humhub/util/permission_handler.dart';
 import 'package:humhub/util/storage_service.dart';
@@ -68,7 +70,6 @@ class HumHub {
         'manifestUri': manifestUrl,
         'openerState': openerState.isShown,
         'randomHash': randomHash,
-        'appVersion': appVersion,
         'pushToken': pushToken,
         'history': history.map((manifest) => manifest.toJson()).toList(),
         'fileUploadSettings': fileUploadSettings?.toJson(),
@@ -77,15 +78,24 @@ class HumHub {
 
   factory HumHub.fromJson(Map<String, dynamic> json) {
     return HumHub(
-      manifest: json['manifest'] != null ? Manifest.fromJson(json['manifest']) : null,
+      manifest:
+          json['manifest'] != null ? Manifest.fromJson(json['manifest']) : null,
       manifestUrl: json['manifestUri'],
-      openerState: (json['openerState'] as bool?) ?? true ? OpenerState.shown : OpenerState.hidden,
+      openerState: (json['openerState'] as bool?) ?? true
+          ? OpenerState.shown
+          : OpenerState.hidden,
       randomHash: json['randomHash'],
-      appVersion: json['appVersion'],
       pushToken: json['pushToken'],
-      history: json['history'] != null ? List<Manifest>.from(json['history'].map((json) => Manifest.fromJson(json))) : [],
-      fileUploadSettings: json['fileUploadSettings'] != null ? FileUploadSettings.fromJson(json['fileUploadSettings']) : null,
-      remoteConfig: json['remoteConfig'] != null ? RemoteConfig.fromJson(json['remoteConfig']) : null,
+      history: json['history'] != null
+          ? List<Manifest>.from(
+              json['history'].map((json) => Manifest.fromJson(json)))
+          : [],
+      fileUploadSettings: json['fileUploadSettings'] != null
+          ? FileUploadSettings.fromJson(json['fileUploadSettings'])
+          : null,
+      remoteConfig: json['remoteConfig'] != null
+          ? RemoteConfig.fromJson(json['remoteConfig'])
+          : null,
     );
   }
 
@@ -104,7 +114,8 @@ class HumHub {
   /// will maintain unique entries based on the `startUrl`.
   /// !!! This method should only be called inside a [HumHubNotifier] because it also needs to update secure storage.
   void addOrUpdateHistory(Manifest newManifest) {
-    final existingManifestIndex = history.indexWhere((item) => item.startUrl == newManifest.startUrl);
+    final existingManifestIndex =
+        history.indexWhere((item) => item.startUrl == newManifest.startUrl);
 
     if (existingManifestIndex >= 0) {
       history[existingManifestIndex] = newManifest;
@@ -126,7 +137,8 @@ class HumHub {
   /// removed manifest after this operation.
   /// !!! This method should only be called inside a [HumHubNotifier] because it also needs to update secure storage.
   bool removeFromHistory(Manifest manifest) {
-    final existingManifestIndex = history.indexWhere((item) => item == manifest);
+    final existingManifestIndex =
+        history.indexWhere((item) => item == manifest);
 
     if (existingManifestIndex >= 0) {
       history.removeAt(existingManifestIndex);
@@ -141,8 +153,10 @@ class HumHub {
       return RedirectAction.opener;
     } else {
       if (manifest != null) {
-        UniversalOpenerController openerController = UniversalOpenerController(url: manifest!.baseUrl);
-        String? manifestUrl = await openerController.findManifest(manifest!.baseUrl);
+        UniversalOpenerController openerController =
+            UniversalOpenerController(url: manifest!.baseUrl);
+        String? manifestUrl =
+            await openerController.findManifest(manifest!.baseUrl);
         if (manifestUrl == null) {
           return RedirectAction.opener;
         } else {
@@ -155,11 +169,13 @@ class HumHub {
 
   Map<String, String> get customHeaders => {
         'x-humhub-app-token': randomHash ?? '',
-        'x-humhub-app': appVersion ?? '1.0.0',
+        'x-humhub-app': GlobalPackageInfo.info.version,
+        'x-humhub-app-feature-flags': FeatureFlag.featureFlagsHeaderValue,
         'x-humhub-app-is-ios': isIos ? '1' : '0',
         'x-humhub-app-is-android': isAndroid ? '1' : '0',
         'x-humhub-app-opener-state': openerState.headerValue,
         'x-humhub-app-is-multi-instance': '1',
+        'x-humhub-app-intent-enabled': AppLinkSettings.headerValue,
       };
 
   HumHub copyWith({
@@ -191,9 +207,13 @@ class HumHub {
     Loggy.initLoggy(
       logPrinter: const GlobalLog(),
     );
-    bool isCrashlyticsEnabled = (await DataSharingConsentNotifier.isErrorCollectionEnabled && !kDebugMode);
-    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(isCrashlyticsEnabled);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge, overlays: [SystemUiOverlay.top]);
+    bool isCrashlyticsEnabled =
+        (await DataSharingConsentNotifier.isErrorCollectionEnabled &&
+            !kDebugMode);
+    await FirebaseCrashlytics.instance
+        .setCrashlyticsCollectionEnabled(isCrashlyticsEnabled);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge,
+        overlays: [SystemUiOverlay.top]);
     await SecureStorageService.clearSecureStorageOnReinstall();
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -203,7 +223,13 @@ class HumHub {
     );
     await GlobalPackageInfo.init();
     await PermissionHandler.requestPermissions(
-      [Permission.notification, Permission.camera, Permission.microphone, Permission.storage, Permission.photos],
+      [
+        Permission.notification,
+        Permission.camera,
+        Permission.microphone,
+        Permission.storage,
+        Permission.photos
+      ],
     );
     switch (GlobalPackageInfo.info.packageName) {
       // TODO RX1 bundle_id

@@ -6,16 +6,21 @@ import 'package:loggy/loggy.dart';
 import 'manifest.dart';
 
 class RemoteConfig {
+  static const String _authClientRedirectVersion = '1.19.0';
   final String? appName;
   final String? appVersion;
   final FileUploadSettings? fileUploadSettings;
   final List<Uri>? whiteListedDomains;
+  final List<String>? whiteListedUrls;
+  final List<String>? authClientUrls;
 
   RemoteConfig({
     required this.appName,
     required this.appVersion,
     required this.fileUploadSettings,
     required this.whiteListedDomains,
+    required this.whiteListedUrls,
+    required this.authClientUrls,
   });
 
   factory RemoteConfig.fromJson(Map<String, dynamic> json) {
@@ -23,7 +28,13 @@ class RemoteConfig {
       appName: json['appName'] as String,
       appVersion: json['appVersion'] as String,
       fileUploadSettings: FileUploadSettings.fromJson(json['fileUploadSettings'] as Map<String, dynamic>),
-      whiteListedDomains: (json['whiteListedDomains'] as List<dynamic>).map((e) => Uri.tryParse(e as String)).where((uri) => uri != null).cast<Uri>().toList(),
+      whiteListedDomains: json['whiteListedDomains'] == null
+          ? null
+          : (json['whiteListedDomains'] as List<dynamic>).map((e) => Uri.tryParse(e as String)).where((uri) => uri != null).cast<Uri>().toList(),
+      whiteListedUrls:
+          json['whiteListedUrls'] == null ? null : (json['whiteListedUrls'] as List<dynamic>).map((e) => e as String).where((s) => s.isNotEmpty).toList(),
+      authClientUrls:
+          json['authClientUrls'] == null ? null : (json['authClientUrls'] as List<dynamic>).map((e) => e as String).where((s) => s.isNotEmpty).toList(),
     );
   }
 
@@ -33,6 +44,8 @@ class RemoteConfig {
       'appVersion': appVersion,
       'fileUploadSettings': fileUploadSettings?.toJson(),
       'whiteListedDomains': whiteListedDomains?.map((uri) => uri.toString()).toList(),
+      'whiteListedUrls': whiteListedUrls,
+      'authClientUrls': authClientUrls,
     };
   }
 
@@ -55,6 +68,16 @@ class RemoteConfig {
     }
   }
 
+  bool isTrustedUrl(Uri uri) {
+    final combined = [...?whiteListedUrls, ...?authClientUrls];
+    if (combined.isEmpty) return false;
+    final String fullUrl = uri.toString();
+    return combined.any((pattern) {
+      final regexStr = RegExp.escape(pattern).replaceAll(r'\*', r'[^/?#]*');
+      return RegExp('^$regexStr').hasMatch(fullUrl);
+    });
+  }
+
   bool isTrustedDomain(Uri uri) {
     if (whiteListedDomains.isNullOrEmpty) return false;
     final String inputBase = '${uri.scheme}://${uri.authority}';
@@ -63,5 +86,53 @@ class RemoteConfig {
       final trustedBase = '${trustedUri.scheme}://${trustedUri.authority}';
       return inputBase == trustedBase;
     });
+  }
+
+  bool get supportsAuthClientRedirect => _compareVersions(appVersion, _authClientRedirectVersion) >= 0;
+
+  static int _compareVersions(String? current, String target) {
+    final currentParts = _parseVersion(current);
+    final targetParts = _parseVersion(target);
+
+    if (currentParts == null || targetParts == null) {
+      return -1;
+    }
+
+    for (var index = 0; index < 3; index++) {
+      final difference = currentParts[index] - targetParts[index];
+      if (difference != 0) {
+        return difference;
+      }
+    }
+
+    return 0;
+  }
+
+  static List<int>? _parseVersion(String? version) {
+    if (version == null || version.isEmpty) {
+      return null;
+    }
+
+    final normalizedVersion = version.split('+').first.split('-').first.trim();
+    final parts = normalizedVersion.split('.');
+    if (parts.isEmpty) {
+      return null;
+    }
+
+    final parsed = <int>[];
+    for (var index = 0; index < 3; index++) {
+      if (index >= parts.length) {
+        parsed.add(0);
+        continue;
+      }
+
+      final value = int.tryParse(parts[index]);
+      if (value == null) {
+        return null;
+      }
+      parsed.add(value);
+    }
+
+    return parsed;
   }
 }

@@ -1,20 +1,19 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:app_badge_plus/app_badge_plus.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:humhub/util/auth_in_app_browser.dart';
+import 'package:humhub/models/auth_web_view_args.dart';
 import 'package:humhub/models/channel_message.dart';
+import 'package:humhub/models/feature_flag.dart';
 import 'package:humhub/models/hum_hub.dart';
 import 'package:humhub/models/manifest.dart';
+import 'package:humhub/pages/auth_web_view.dart';
 import 'package:humhub/pages/opener/opener.dart';
 import 'package:humhub/util/black_list_rules.dart';
-import 'package:humhub/util/connectivity_plugin.dart';
 import 'package:humhub/util/const.dart';
 import 'package:humhub/util/crypt.dart';
 import 'package:humhub/util/extensions.dart';
@@ -26,10 +25,11 @@ import 'package:humhub/util/loading_provider.dart';
 import 'package:humhub/util/providers.dart';
 import 'package:humhub/util/openers/universal_opener_controller.dart';
 import 'package:humhub/util/push/provider.dart';
+import 'package:humhub/util/push/register_token_plugin.dart';
 import 'package:humhub/util/router.dart';
 import 'package:humhub/util/web_view_global_controller.dart';
+import 'package:humhub/components/file_actions_bottom_sheet.dart';
 import 'package:loggy/loggy.dart';
-import 'package:open_file/open_file.dart';
 import 'package:humhub/util/router.dart' as m;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:humhub/l10n/generated/app_localizations.dart';
@@ -46,34 +46,32 @@ class WebView extends ConsumerStatefulWidget {
 
 class WebViewAppState extends ConsumerState<WebView> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
-  late AuthInAppBrowser _authBrowser;
   late Manifest _manifest;
   late URLRequest _initialRequest;
   late PullToRefreshController _pullToRefreshController;
   HeadlessInAppWebView? _headlessWebView;
   bool _isInit = false;
+  Timer? _pageIdleTimer;
+  bool _pushTokenRegistered = false;
+  static const _pageIdleDuration = Duration(seconds: 5);
 
-  StreamSubscription<List<ConnectivityResult>>? _subscription;
   StreamSubscription<bool>? _keyboardSubscription;
-  final KeyboardVisibilityController _keyboardVisibilityController = KeyboardVisibilityController();
-  EdgeInsets get noKeyboardBottomPadding => MediaQuery.of(context).padding.copyWith(bottom: 0);
+  final KeyboardVisibilityController _keyboardVisibilityController =
+      KeyboardVisibilityController();
+  EdgeInsets get noKeyboardBottomPadding =>
+      MediaQuery.of(context).padding.copyWith(bottom: 0);
   late EdgeInsets initKeyboardPadding = MediaQuery.of(context).padding;
   bool keyboardVisible = false;
 
   @override
   void initState() {
     super.initState();
-    _subscription = Connectivity().onConnectivityChanged.listen((results) {
-      final hasConnection = results.any((r) => r != ConnectivityResult.none);
-      if (hasConnection) {
-        // Internet is back
-        WebViewGlobalController.value?.reload();
-      }
-    });
-
-    _keyboardSubscription = _keyboardVisibilityController.onChange.listen((bool visible) async {
+    _keyboardSubscription =
+        _keyboardVisibilityController.onChange.listen((bool visible) async {
       keyboardVisible = visible;
-      await WebViewGlobalController.setWebViewSafeAreaPadding(safeArea: !keyboardVisible ? initKeyboardPadding : noKeyboardBottomPadding);
+      await WebViewGlobalController.setWebViewSafeAreaPadding(
+          safeArea:
+              !keyboardVisible ? initKeyboardPadding : noKeyboardBottomPadding);
     });
   }
 
@@ -88,18 +86,10 @@ class WebViewAppState extends ConsumerState<WebView> {
           color: HexColor(_manifest.themeColor),
         ),
         onRefresh: () async {
-          if (Platform.isAndroid) {
-            WebViewGlobalController.value?.reload();
-          } else if (Platform.isIOS) {
-            WebViewGlobalController.value
-                ?.loadUrl(urlRequest: URLRequest(url: await WebViewGlobalController.value?.getUrl(), headers: ref.read(humHubProvider).customHeaders));
-          }
-        },
-      );
-      _authBrowser = AuthInAppBrowser(
-        manifest: _manifest,
-        concludeAuth: (URLRequest request) {
-          _concludeAuth(request);
+          WebViewGlobalController.value?.loadUrl(
+              urlRequest: URLRequest(
+                  url: await WebViewGlobalController.value?.getUrl(),
+                  headers: ref.read(humHubProvider).customHeaders));
         },
       );
       _isInit = true;
@@ -118,6 +108,7 @@ class WebViewAppState extends ConsumerState<WebView> {
           onPopInvokedWithResult: (didPop, result) => exitApp(context, ref),
           child: FileUploadManagerWidget(
             child: InAppWebView(
+              preventGestureDelay: true,
               initialUrlRequest: _initialRequest,
               initialSettings: WebViewGlobalController.settings(),
               pullToRefreshController: _pullToRefreshController,
@@ -130,12 +121,15 @@ class WebViewAppState extends ConsumerState<WebView> {
               onProgressChanged: _onProgressChanged,
               onReceivedError: _onReceivedError,
               onDownloadStartRequest: _onDownloadStartRequest,
-              onLongPressHitTestResult: WebViewGlobalController.onLongPressHitTestResult,
+              onLongPressHitTestResult:
+                  WebViewGlobalController.onLongPressHitTestResult,
               onReceivedHttpError: (controller, request, errorResponse) {
                 logError(errorResponse);
               },
               onPermissionRequest: (controller, request) async {
-                return PermissionResponse(resources: request.resources, action: PermissionResponseAction.GRANT);
+                return PermissionResponse(
+                    resources: request.resources,
+                    action: PermissionResponseAction.GRANT);
               },
             ),
           ),
@@ -152,7 +146,7 @@ class WebViewAppState extends ConsumerState<WebView> {
     }
     if (args is UniversalOpenerController) {
       UniversalOpenerController controller = args;
-      ref.read(humHubProvider).setInstance(controller.humhub);
+      Future(() => ref.read(humHubProvider).setInstance(controller.humhub));
       _manifest = controller.humhub.manifest!;
       url = controller.url;
     }
@@ -166,17 +160,25 @@ class WebViewAppState extends ConsumerState<WebView> {
     }
     String? payloadFromPush = InitFromUrl.usePayload();
     if (payloadFromPush != null) url = payloadFromPush;
-    return URLRequest(url: WebUri(url ?? _manifest.startUrl), headers: ref.read(humHubProvider).customHeaders);
+    return URLRequest(
+        url: WebUri(url ?? _manifest.startUrl),
+        headers: ref.read(humHubProvider).customHeaders);
   }
 
-  Future<NavigationActionPolicy?> _shouldOverrideUrlLoading(InAppWebViewController controller, NavigationAction action) async {
-    WebViewGlobalController.ajaxSetHeaders(headers: ref.read(humHubProvider).customHeaders);
+  Future<NavigationActionPolicy?> _shouldOverrideUrlLoading(
+      InAppWebViewController controller, NavigationAction action) async {
+    WebViewGlobalController.ajaxSetHeaders(
+        headers: ref.read(humHubProvider).customHeaders);
     WebViewGlobalController.listenToImageOpen();
     WebViewGlobalController.appendViewportFitCover();
-    await WebViewGlobalController.setWebViewSafeAreaPadding(safeArea: !keyboardVisible ? initKeyboardPadding : noKeyboardBottomPadding);
+    await WebViewGlobalController.setWebViewSafeAreaPadding(
+        safeArea:
+            !keyboardVisible ? initKeyboardPadding : noKeyboardBottomPadding);
 
-    if (WebViewGlobalController.isCommonURIScheme(webUri: action.request.url!)) {
-      return WebViewGlobalController.handleCommonURISchemes(webUri: action.request.url!);
+    if (WebViewGlobalController.isCommonURIScheme(
+        webUri: action.request.url!)) {
+      return WebViewGlobalController.handleCommonURISchemes(
+          webUri: action.request.url!);
     }
 
     final url = action.request.url!.rawValue;
@@ -188,22 +190,32 @@ class WebViewAppState extends ConsumerState<WebView> {
       logInfo('Blocked navigation to $url by blacklist rules');
       return NavigationActionPolicy.CANCEL;
     }
-    // For SSO
-    bool? isDomainTrusted = ref.read(humHubProvider).remoteConfig?.isTrustedDomain(action.request.url!.uriValue) ?? false;
-    if ((!url.startsWith(_manifest.baseUrl) && action.isForMainFrame) && !isDomainTrusted) {
-      logInfo('SSO detected, launching AuthInAppBrowser for $url');
-      _authBrowser.launchUrl(action.request);
-      return NavigationActionPolicy.CANCEL;
-    }
-    // For all other external links
-    if (!url.startsWith(_manifest.baseUrl) && !action.isForMainFrame && action.navigationType == NavigationType.LINK_ACTIVATED) {
+    // Route external main-frame URLs based on whiteListedUrls presence
+    final remoteConfig = ref.read(humHubProvider).remoteConfig;
+    if (!url.startsWith(_manifest.startUrl) && action.isForMainFrame) {
+      if (remoteConfig?.whiteListedUrls == null && remoteConfig?.authClientUrls == null) {
+        logInfo('Legacy SSO detected, launching AuthWebView for $url');
+        unawaited(_launchAuthWebView(action.request));
+        return NavigationActionPolicy.CANCEL;
+      }
+      if (remoteConfig!.isTrustedUrl(action.request.url!.uriValue)) {
+        logInfo('Whitelisted URL, launching AuthWebView for $url');
+        unawaited(_launchAuthWebView(action.request));
+        return NavigationActionPolicy.CANCEL;
+      }
       logInfo('External link detected, launching external application for $url');
-      await launchUrl(action.request.url!.uriValue, mode: LaunchMode.externalApplication);
+      await launchUrl(action.request.url!.uriValue,
+          mode: LaunchMode.externalApplication);
       return NavigationActionPolicy.CANCEL;
     }
     // 2nd Append customHeader if url is in app redirect and CANCEL the requests without custom headers
-    if (Platform.isAndroid || action.navigationType == NavigationType.LINK_ACTIVATED || action.navigationType == NavigationType.FORM_SUBMITTED) {
-      Map<String, String> mergedMap = {...?_initialRequest.headers, ...?action.request.headers};
+    if (Platform.isAndroid ||
+        action.navigationType == NavigationType.LINK_ACTIVATED ||
+        action.navigationType == NavigationType.FORM_SUBMITTED) {
+      Map<String, String> mergedMap = {
+        ...?_initialRequest.headers,
+        ...?action.request.headers
+      };
       URLRequest newRequest = action.request.copyWith(headers: mergedMap);
       controller.loadUrl(urlRequest: newRequest);
       return NavigationActionPolicy.CANCEL;
@@ -218,7 +230,8 @@ class WebViewAppState extends ConsumerState<WebView> {
     await controller.addWebMessageListener(
       WebMessageListener(
         jsObjectName: "flutterChannel",
-        onPostMessage: (inMessage, sourceOrigin, isMainFrame, replyProxy) async {
+        onPostMessage:
+            (inMessage, sourceOrigin, isMainFrame, replyProxy) async {
           logInfo(inMessage);
           ChannelMessage message = ChannelMessage.fromJson(inMessage!.data);
           await _handleJSMessage(message, _headlessWebView!);
@@ -229,13 +242,25 @@ class WebViewAppState extends ConsumerState<WebView> {
     WebViewGlobalController.setValue(controller);
   }
 
-  Future<FetchRequest?> _shouldInterceptFetchRequest(InAppWebViewController controller, FetchRequest request) async {
+  void _scheduleTokenRegistrationCheck() {
+    _pageIdleTimer?.cancel();
+    _pageIdleTimer = Timer(_pageIdleDuration, () {
+      if (_pushTokenRegistered) return;
+      if (ref.read(humHubProvider).openerState != OpenerState.hidden) return;
+      _pushTokenRegistered = true;
+      unawaited(registerPushToken(ref));
+    });
+  }
+
+  Future<FetchRequest?> _shouldInterceptFetchRequest(
+      InAppWebViewController controller, FetchRequest request) async {
     logDebug("_shouldInterceptFetchRequest");
     request.headers?.addAll(_initialRequest.headers!);
     return request;
   }
 
-  Future<bool?> _onCreateWindow(InAppWebViewController controller, CreateWindowAction createWindowAction) async {
+  Future<bool?> _onCreateWindow(InAppWebViewController controller,
+      CreateWindowAction createWindowAction) async {
     WebUri? urlToOpen = createWindowAction.request.url;
 
     if (urlToOpen == null) return Future.value(false);
@@ -245,6 +270,13 @@ class WebViewAppState extends ConsumerState<WebView> {
     )) {
       controller.loadUrl(urlRequest: createWindowAction.request);
       return Future.value(false);
+    }
+
+    final remoteConfig = ref.read(humHubProvider).remoteConfig;
+    if ((remoteConfig?.whiteListedUrls == null && remoteConfig?.authClientUrls == null) ||
+        remoteConfig!.isTrustedUrl(urlToOpen.uriValue)) {
+      unawaited(_launchAuthWebView(createWindowAction.request));
+      return Future.value(true);
     }
 
     if (await canLaunchUrl(urlToOpen)) {
@@ -258,21 +290,30 @@ class WebViewAppState extends ConsumerState<WebView> {
 
   _onLoadStop(InAppWebViewController controller, Uri? url) async {
     logDebug('Page load stopped: $url');
-    if (url!.path.contains('/user/auth/login')) WebViewGlobalController.setLoginForm();
-    WebViewGlobalController.ajaxSetHeaders(headers: ref.read(humHubProvider).customHeaders);
+    if (url!.path.contains('/user/auth/login')) {
+      WebViewGlobalController.setLoginForm();
+    }
+    WebViewGlobalController.ajaxSetHeaders(
+        headers: ref.read(humHubProvider).customHeaders);
     WebViewGlobalController.listenToImageOpen();
     WebViewGlobalController.appendViewportFitCover();
-    await WebViewGlobalController.setWebViewSafeAreaPadding(safeArea: !keyboardVisible ? initKeyboardPadding : noKeyboardBottomPadding);
-
+    await WebViewGlobalController.setWebViewSafeAreaPadding(
+        safeArea:
+            !keyboardVisible ? initKeyboardPadding : noKeyboardBottomPadding);
     LoadingProvider.of(ref).dismissAll();
+    _scheduleTokenRegistrationCheck();
   }
 
   void _onLoadStart(InAppWebViewController controller, Uri? url) async {
     logDebug('Page load started: $url');
-    WebViewGlobalController.ajaxSetHeaders(headers: ref.read(humHubProvider).customHeaders);
+    _pageIdleTimer?.cancel();
+    WebViewGlobalController.ajaxSetHeaders(
+        headers: ref.read(humHubProvider).customHeaders);
     WebViewGlobalController.listenToImageOpen();
     WebViewGlobalController.appendViewportFitCover();
-    await WebViewGlobalController.setWebViewSafeAreaPadding(safeArea: !keyboardVisible ? initKeyboardPadding : noKeyboardBottomPadding);
+    await WebViewGlobalController.setWebViewSafeAreaPadding(
+        safeArea:
+            !keyboardVisible ? initKeyboardPadding : noKeyboardBottomPadding);
   }
 
   _onProgressChanged(InAppWebViewController controller, int progress) {
@@ -282,25 +323,65 @@ class WebViewAppState extends ConsumerState<WebView> {
     }
   }
 
-  void _onReceivedError(InAppWebViewController controller, WebResourceRequest request, WebResourceError error) {
-    if ([WebResourceErrorType.NOT_CONNECTED_TO_INTERNET, WebResourceErrorType.TIMEOUT].contains(error.type)) {
+  void _onReceivedError(InAppWebViewController controller,
+      WebResourceRequest request, WebResourceError error) {
+    if ([
+      WebResourceErrorType.NOT_CONNECTED_TO_INTERNET,
+      WebResourceErrorType.TIMEOUT
+    ].contains(error.type)) {
       logWarning('No internet connection detected');
-      NoConnectionDialog.show(context);
       LoadingProvider.of(ref).dismissAll();
     }
   }
 
   _concludeAuth(URLRequest request) {
-    _authBrowser.close();
-    WebViewGlobalController.value!.loadUrl(urlRequest: request);
+    Map<String, String> mergedMap = {
+      ...ref.read(humHubProvider).customHeaders,
+      ...?request.headers,
+    };
+    WebViewGlobalController.value!
+        .loadUrl(urlRequest: request.copyWith(headers: mergedMap));
   }
 
-  Future<void> _handleJSMessage(ChannelMessage message, HeadlessInAppWebView headlessWebView) async {
+  Future<void> _launchAuthWebView(URLRequest request) async {
+    final result = await Navigator.of(context).pushNamed(
+      AuthWebView.path,
+      arguments: AuthWebViewArgs(
+        manifest: _manifest,
+        request: request,
+      ),
+    );
+
+    if (!mounted || result is! URLRequest) return;
+    _concludeAuth(result);
+  }
+
+  Future<void> _handleJSMessage(
+      ChannelMessage message, HeadlessInAppWebView headlessWebView) async {
     switch (message.action) {
+      case ChannelAction.authClientRedirect:
+        final data = message.data as AuthClientRedirectChannelData;
+        data.handle(
+          isSupported: FeatureFlag.supportsAuthClientRedirect,
+          onIgnored: logInfo,
+          onLaunchable: (request, url) async {
+            if (_supportsAuthClientRedirect) {
+              logInfo('Launching browser from authClientRedirect for $url');
+              await launchUrl(request.url!.uriValue,
+                  mode: LaunchMode.externalApplication);
+              return;
+            }
+
+            logInfo('Launching AuthWebView from authClientRedirect for $url');
+            unawaited(_launchAuthWebView(request));
+          },
+        );
+        break;
       case ChannelAction.showOpener:
         logInfo('Action: showOpener');
         ref.read(humHubProvider).setOpenerState(OpenerState.shown);
-        Navigator.of(context).pushNamedAndRemoveUntil(OpenerPage.path, (Route<dynamic> route) => false);
+        Navigator.of(context).pushNamedAndRemoveUntil(
+            OpenerPage.path, (Route<dynamic> route) => false);
         break;
       case ChannelAction.hideOpener:
         logInfo('Action: hideOpener');
@@ -311,7 +392,8 @@ class WebViewAppState extends ConsumerState<WebView> {
         break;
       case ChannelAction.registerFcmDevice:
         logInfo('Action: registerFcmDevice');
-        String? token = ref.read(pushTokenProvider).value ?? await FirebaseMessaging.instance.getTokenSafe();
+        String? token = ref.read(pushTokenProvider).value ??
+            await FirebaseMessaging.instance.getTokenSafe();
         if (token != null) {
           WebViewGlobalController.ajaxPost(
             url: message.url!,
@@ -322,8 +404,6 @@ class WebViewAppState extends ConsumerState<WebView> {
         break;
       case ChannelAction.updateNotificationCount:
         logInfo('Action: updateNotificationCount');
-        UpdateNotificationCountChannelData data = message.data as UpdateNotificationCountChannelData;
-        AppBadgePlus.updateBadge(data.count);
         break;
       case ChannelAction.nativeConsole:
         logInfo('Action: nativeConsole');
@@ -331,7 +411,8 @@ class WebViewAppState extends ConsumerState<WebView> {
         break;
       case ChannelAction.unregisterFcmDevice:
         logInfo('Action: unregisterFcmDevice');
-        String? token = ref.read(pushTokenProvider).value ?? await FirebaseMessaging.instance.getTokenSafe();
+        String? token = ref.read(pushTokenProvider).value ??
+            await FirebaseMessaging.instance.getTokenSafe();
         if (token != null) {
           WebViewGlobalController.ajaxPost(
             url: message.url!,
@@ -342,7 +423,8 @@ class WebViewAppState extends ConsumerState<WebView> {
         break;
       case ChannelAction.fileUploadSettings:
         logInfo('Action: fileUploadSettings');
-        FileUploadSettingsChannelData data = message.data as FileUploadSettingsChannelData;
+        FileUploadSettingsChannelData data =
+            message.data as FileUploadSettingsChannelData;
         ref.read(humHubProvider.notifier).setFileUploadSettings(data.settings);
         FileUploadManager(
                 webViewController: WebViewGlobalController.value!,
@@ -351,10 +433,31 @@ class WebViewAppState extends ConsumerState<WebView> {
                 context: context)
             .upload();
         break;
+      case ChannelAction.openExternal:
+        logInfo('Action: openExternal');
+        final raw = message.url;
+        if (raw == null || raw.isEmpty) {
+          return;
+        }
+        final uri = Uri.tryParse(raw);
+        if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+          return;
+        }
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        break;
       case ChannelAction.none:
         logInfo('Action: none');
         break;
     }
+  }
+
+  bool get _supportsAuthClientRedirect {
+    final remoteConfig = ref.read(humHubProvider).remoteConfig;
+    final supportsAuthClientRedirect =
+        remoteConfig?.supportsAuthClientRedirect == true;
+    logDebug(
+        'authClientRedirect supported by backend version: $supportsAuthClientRedirect (${remoteConfig?.appVersion ?? 'unknown'})');
+    return supportsAuthClientRedirect;
   }
 
   Future<bool> exitApp(BuildContext context, WidgetRef ref) async {
@@ -371,9 +474,12 @@ class WebViewAppState extends ConsumerState<WebView> {
         exitConfirmed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(10.0))),
-            title: Text(AppLocalizations.of(context)!.web_view_exit_popup_title),
-            content: Text(AppLocalizations.of(context)!.web_view_exit_popup_content),
+            shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(10.0))),
+            title:
+                Text(AppLocalizations.of(context)!.web_view_exit_popup_title),
+            content:
+                Text(AppLocalizations.of(context)!.web_view_exit_popup_content),
             actions: <Widget>[
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
@@ -382,7 +488,8 @@ class WebViewAppState extends ConsumerState<WebView> {
               TextButton(
                 onPressed: () {
                   ref.read(humHubProvider).openerState.isShown
-                      ? Navigator.of(context).pushNamedAndRemoveUntil(OpenerPage.path, (Route<dynamic> route) => false)
+                      ? Navigator.of(context).pushNamedAndRemoveUntil(
+                          OpenerPage.path, (Route<dynamic> route) => false)
                       : SystemNavigator.pop();
                 },
                 child: Text(AppLocalizations.of(context)!.yes),
@@ -395,7 +502,8 @@ class WebViewAppState extends ConsumerState<WebView> {
     }
   }
 
-  void _onDownloadStartRequest(InAppWebViewController controller, DownloadStartRequest downloadStartRequest) async {
+  void _onDownloadStartRequest(InAppWebViewController controller,
+      DownloadStartRequest downloadStartRequest) async {
     logInfo('Download started: ${downloadStartRequest.url}');
     PersistentBottomSheetController? persistentController;
 
@@ -414,18 +522,7 @@ class WebViewAppState extends ConsumerState<WebView> {
         Navigator.popUntil(context, ModalRoute.withName(WebView.path));
         logInfo('Download succeeded: $filename at ${file.path}');
         isDone = true;
-        Keys.scaffoldMessengerStateKey.currentState?.showSnackBar(
-          SnackBar(
-            content: Text('${AppLocalizations.of(context)!.file_download}: $filename'),
-            action: SnackBarAction(
-              label: AppLocalizations.of(context)!.open,
-              onPressed: () {
-                //file.open();
-                OpenFile.open(file.path);
-              },
-            ),
-          ),
-        );
+        FileActionsBottomSheet.show(context, file, filename);
       },
       onStart: () async {
         downloadProgress = 0;
@@ -433,19 +530,22 @@ class WebViewAppState extends ConsumerState<WebView> {
         downloadTimer = Timer(const Duration(seconds: 1), () {
           // Show the persistent bottom sheet if not already shown
           if (!isDone) {
-            persistentController = _scaffoldKey.currentState!.showBottomSheet((context) {
+            persistentController =
+                _scaffoldKey.currentState!.showBottomSheet((context) {
               return Container(
                 width: MediaQuery.of(context).size.width,
                 height: 100,
                 color: const Color(0xff313033),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         "${AppLocalizations.of(context)!.downloading}...",
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                       Stack(
                         alignment: Alignment.center,
@@ -510,8 +610,8 @@ class WebViewAppState extends ConsumerState<WebView> {
   void dispose() {
     logInfo('Disposing WebView and controllers');
     if (_headlessWebView != null) _headlessWebView!.dispose();
-    _subscription?.cancel();
     _keyboardSubscription?.cancel();
+    _pageIdleTimer?.cancel();
     super.dispose();
   }
 }

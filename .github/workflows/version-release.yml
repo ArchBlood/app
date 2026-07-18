@@ -76,7 +76,7 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.0'
+          flutter-version: '3.44.6'
           channel: 'stable'
       - uses: chkfung/android-version-actions@v1.2.1
         with:
@@ -143,7 +143,7 @@ jobs:
       - name: Select Xcode version
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: 26.3
       - name: Install the Apple certificate and provisioning profile
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.APPSTORE_BUILD_CERTIFICATE_BASE64 }}
@@ -180,11 +180,25 @@ jobs:
       - name: Install Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.0'
+          flutter-version: '3.44.6'
           channel: 'stable'
+          cache: true
+      - name: Flutter doctor
+        run: flutter doctor -v
 
-      - name: Install pub dependencies
-        run: flutter pub get
+      - name: Reset + install iOS pods (correct order)
+        run: |
+          flutter clean
+          flutter pub get
+          
+          rm -rf ios/Pods ios/Podfile.lock
+          cd ios
+          pod deintegrate
+          pod repo update
+          pod install --repo-update
+          cd ..
+      - name: Flutter precache
+        run: flutter precache --ios
 
       - name: Install flutterfire CLI
         run: |
@@ -235,7 +249,7 @@ jobs:
   release_ios:
     name: Release IPA to TestFlight
     needs: [ build_ios ]
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - name: Checkout
         uses: actions/checkout@v3

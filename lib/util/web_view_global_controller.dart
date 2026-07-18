@@ -49,7 +49,7 @@ class WebViewGlobalController {
     _value = newValue;
   }
 
-  static void ajaxPost({required String url, required String data, Map<String, String>? headers}) {
+  static dynamic ajaxPost({required String url, required String data, Map<String, String>? headers}) async {
     String jsonHeaders = jsonEncode(headers);
     String jsCode4 = """
           \$.ajax({
@@ -60,7 +60,7 @@ class WebViewGlobalController {
               async: false, // IMPORTANT: it needs to be sync
           });
     """;
-    value?.evaluateJavascript(source: jsCode4);
+    return await value?.evaluateJavascript(source: jsCode4);
   }
 
   static void ajaxSetHeaders({Map<String, String>? headers}) {
@@ -219,6 +219,7 @@ class WebViewGlobalController {
   }
 
   static InAppWebViewSettings settings({bool zoom = false}) {
+    final userAgent = GlobalUserAgent.value;
     return InAppWebViewSettings(
       useShouldOverrideUrlLoading: true,
       useShouldInterceptFetchRequest: false,
@@ -230,7 +231,7 @@ class WebViewGlobalController {
       mediaPlaybackRequiresUserGesture: false,
       domStorageEnabled: true,
       supportZoom: zoom ? true : false,
-      userAgent: GlobalUserAgent.value,
+      userAgent: userAgent,
       applicationNameForUserAgent: GlobalPackageInfo.info.appName,
       allowFileAccessFromFileURLs: true,
       allowUniversalAccessFromFileURLs: true,

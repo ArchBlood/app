@@ -1,14 +1,19 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:humhub/flavored/models/manifest.f.dart';
+import 'package:humhub/models/feature_flag.dart';
 import 'package:humhub/models/global_package_info.dart';
 import 'package:humhub/models/hum_hub.dart';
 import 'package:humhub/util/crypt.dart';
+import 'package:humhub/util/intent/app_link_settings.dart';
 
 class HumHubF extends HumHub {
+  static const bool _defaultForceV2AuthClient = false;
+
   @override
   ManifestF get manifest => ManifestF.fromEnv();
   @override
   String get manifestUrl => dotenv.env['MANIFEST_URL']!;
+  bool get forceV2AuthClient => dotenv.env['FORCE_V2_AUTH_CLIENT'] == null ? _defaultForceV2AuthClient : dotenv.env['FORCE_V2_AUTH_CLIENT']!.toLowerCase() == 'true';
 
   HumHubF({
     super.openerState,
@@ -20,10 +25,12 @@ class HumHubF extends HumHub {
   @override
   Map<String, String> get customHeaders => {
         'x-humhub-app-token': randomHash!,
-        'x-humhub-app': appVersion ?? '1.0.0',
+        'x-humhub-app': GlobalPackageInfo.info.version,
+        'x-humhub-app-feature-flags': FeatureFlag.featureFlagsHeaderValue,
         'x-humhub-app-bundle-id': GlobalPackageInfo.info.packageName,
         'x-humhub-app-is-ios': isIos ? '1' : '0',
         'x-humhub-app-is-android': isAndroid ? '1' : '0',
-        'x-humhub-app-ostate': openerState.headerValue
+        'x-humhub-app-ostate': openerState.headerValue,
+        'x-humhub-app-intent-enabled': AppLinkSettings.headerValue,
       };
 }

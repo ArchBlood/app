@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:humhub/models/feature_flag.dart';
 import 'package:humhub/models/file_upload_settings.dart';
 import 'package:humhub/models/hum_hub.dart';
 import 'package:humhub/models/manifest.dart';
@@ -20,6 +21,7 @@ class HumHubNotifier extends ChangeNotifier {
   String? get pushToken => _humHubInstance.pushToken;
   String? get manifestUrl => _humHubInstance.manifestUrl;
   Map<String, String> get customHeaders => _humHubInstance.customHeaders;
+  bool get supportsAuthClientRedirect => FeatureFlag.supportsAuthClientRedirect;
   RemoteConfig? get remoteConfig => _humHubInstance.remoteConfig;
   List<Manifest> get history => _humHubInstance.history;
   FileUploadSettings? get fileUploadSettings => _humHubInstance.fileUploadSettings;
@@ -147,9 +149,9 @@ class HumHubNotifier extends ChangeNotifier {
 
     String lastUrl = (_humHubInstance.manifestUrl != null ? _humHubInstance.manifestUrl! : this.lastUrl);
 
-    await SecureStorageService.instance.write(key: SecureStorageService.keys.humhubInstance, value: jsonString);
+    await SecureStorageService.write(key: SecureStorageService.keys.humhubInstance, value: jsonString);
 
-    await SecureStorageService.instance.write(key: SecureStorageService.keys.lastInstanceUrl, value: lastUrl);
+    await SecureStorageService.write(key: SecureStorageService.keys.lastInstanceUrl, value: lastUrl);
   }
 }
 

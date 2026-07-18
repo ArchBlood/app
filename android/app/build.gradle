@@ -33,7 +33,14 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace 'com.humhub.app'
     compileSdkVersion 35
+    compileSdk = 36
     ndkVersion flutter.ndkVersion
+
+    externalNativeBuild {
+        cmake {
+            version "3.31.5"
+        }
+    }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -44,6 +51,9 @@ android {
     kotlinOptions {
         jvmTarget = '17'
     }
+    kotlin {
+        jvmToolchain(17)
+    }
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
@@ -51,7 +61,7 @@ android {
 
     defaultConfig {
         applicationId "com.humhub.app"
-        minSdkVersion 23
+        minSdkVersion flutter.minSdkVersion
         targetSdkVersion 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

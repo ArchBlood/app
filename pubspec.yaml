@@ -40,10 +40,7 @@ dependencies:
   permission_handler: ^11.3.1
   flutter_secure_storage: ^9.2.4
   flutter_inappwebview: ^6.0.0
-  receive_sharing_intent:
-    git:
-      url: https://github.com/KasemJaffer/receive_sharing_intent
-      ref: master
+  listen_sharing_intent: ^1.9.2
   package_info_plus: ^8.2.1
   app_links: ^6.3.3
   firebase_messaging: ^15.2.7
@@ -51,6 +48,7 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   loggy: ^2.0.3
   app_badge_plus: ^1.1.6
+  share_plus: ^10.1.4
   rive: ^0.9.0
   connectivity_plus: ^6.1.3
   swipe_to: ^1.0.2
@@ -67,7 +65,9 @@ dependencies:
   flutter_svg: ^2.0.9
   flutter_styled_toast: ^2.2.1
   open_file: ^3.5.10
+  flutter_file_dialog: ^3.0.3
   flutter_keyboard_visibility: ^6.0.0
+  internet_connection_checker_plus: ^1.0.1
 
 dependency_overrides:
   url_launcher_android: 6.3.9

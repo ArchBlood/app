@@ -22,11 +22,18 @@
   "more_info_third_par": "Toutes les informations peuvent être trouvées ici :",
   "more_info_pro_edition": "Visitez HumHub.com",
 
-  "connectivity_popup_title": "Pas de connexion",
-  "connectivity_popup_content": "Veuillez vérifier votre connexion Internet et réessayer.",
+  "connectivity_popup_title": "Pas de connexion Internet",
+  "connectivity_popup_content": "Veuillez vérifier votre connexion et réessayer",
 
   "web_view_exit_popup_title": "Êtes-vous sûr ?",
   "web_view_exit_popup_content": "Voulez-vous quitter l'application ?",
+
+  "auth_web_view_back": "Retour",
+  "auth_web_view_go_back": "Retour",
+  "auth_web_view_go_forward": "Avancer",
+  "auth_web_view_share": "Partager",
+  "auth_web_view_reload": "Recharger",
+  "auth_web_view_close": "Fermer",
 
   "file_download": "Fichier téléchargé",
   "generic_error": "Oups ! Quelque chose s'est mal passé.",
@@ -39,6 +46,8 @@
   "settings": "Paramètres",
   "connect": "Connecter",
   "open": "Ouvrir",
+  "share": "Partager",
+  "save": "Enregistrer sur l'appareil",
   "cancel": "Annuler",
   "url": "URL",
   "back": "Retour",
@@ -79,6 +88,8 @@
   },
   "file_sharing_error": "Erreur de partage de fichier",
   "close": "Fermer",
+  "intent_links_disabled_popup_title": "L'ouverture des liens pris en charge est désactivée",
+  "intent_links_disabled_popup_content": "Les liens de Humhub s'ouvriront dans votre navigateur tant que vous n'aurez pas réactivé les adresses Web prises en charge pour cette application.",
 
   "language_en": "Anglais",
   "language_de": "Allemand",
